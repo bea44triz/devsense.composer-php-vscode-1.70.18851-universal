@@ -1,64 +1,45 @@
 import NextAuth from 'next-auth'
 import Google from 'next-auth/providers/google'
-
-const ADMIN_EMAILS = (process.env.ADMIN_EMAILS ?? '').split(',').map(e => e.trim().toLowerCase())
+import { getOrCreateGerenciador } from '@/lib/gerenciadores'
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
     Google({
       clientId:     process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      // Apenas identidade — Sheets é acessado via service account, não pelo token do gerenciador
       authorization: {
-        params: {
-          // Request Sheets scope at login time — tokens arrive in account.access_token
-          scope: [
-            'openid',
-            'email',
-            'profile',
-            'https://www.googleapis.com/auth/spreadsheets',
-          ].join(' '),
-          access_type: 'offline',  // get refresh_token
-          prompt: 'consent',       // always show consent so refresh_token is returned
-        },
+        params: { scope: 'openid email profile' },
       },
     }),
   ],
 
   callbacks: {
-    // Persist OAuth tokens in the JWT so API routes can use them
-    async jwt({ token, account }) {
-      if (account) {
-        token.access_token  = account.access_token
-        token.refresh_token = account.refresh_token
-        token.expires_at    = account.expires_at
+    // Executado só no primeiro login (quando `account` está presente).
+    // Registra o gerenciador na planilha se ainda não existir.
+    async jwt({ token, account, profile }) {
+      if (account && profile?.email) {
+        const gerenciador = await getOrCreateGerenciador({
+          email: profile.email,
+          nome:  (profile as { name?: string }).name ?? profile.email,
+        })
+        token.managerId     = gerenciador.id
+        token.managerStatus = gerenciador.status
       }
       return token
     },
 
-    // Expose access_token and role in the session
     async session({ session, token }) {
-      const email  = session.user?.email?.toLowerCase() ?? ''
-      const isAdmin = ADMIN_EMAILS.length === 0 || ADMIN_EMAILS.includes(email)
-
       return {
         ...session,
-        access_token: token.access_token as string | undefined,
-        isAdmin,
+        managerId:     token.managerId as string,
+        managerStatus: token.managerStatus as string,
       }
-    },
-
-    // Block non-admin emails from admin pages
-    async signIn({ profile }) {
-      const email = (profile?.email ?? '').toLowerCase()
-      if (ADMIN_EMAILS.length > 0 && !ADMIN_EMAILS.includes(email)) {
-        return false   // rejects the sign-in; NextAuth shows an error page
-      }
-      return true
     },
   },
 
   pages: {
-    signIn: '/admin/login',
-    error:  '/admin/login',
+    signIn: '/gerenciador/login',
+    error:  '/gerenciador/login',
   },
 })

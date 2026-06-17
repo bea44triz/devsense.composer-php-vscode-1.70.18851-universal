@@ -2,7 +2,7 @@ import 'next-auth'
 
 declare module 'next-auth' {
   interface Session {
-    access_token?: string
-    isAdmin: boolean
+    managerId:     string
+    managerStatus: string   // 'ativo' | 'pendente' | 'suspenso'
   }
 }

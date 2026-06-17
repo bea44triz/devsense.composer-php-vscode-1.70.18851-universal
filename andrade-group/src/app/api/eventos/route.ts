@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { appendEvento, getEventos } from '@/lib/google-sheets'
+import { auth } from '@/auth'
 import { generateId } from '@/lib/utils'
 import { Evento } from '@/types'
 
@@ -9,13 +10,13 @@ function rowToEvento(r: string[]): Evento {
     horaInicio: r[4], horaFim: r[5], local: r[6],
     endereco: r[7], vagasTotal: Number(r[8]), vagasOcupadas: Number(r[9]),
     valorHora: Number(r[10]), status: r[11] as Evento['status'],
-    createdAt: r[12],
+    createdAt: r[13],
   }
 }
 
 export async function GET() {
   try {
-    const rows = await getEventos()
+    const rows   = await getEventos()
     const eventos = rows.slice(1).map(rowToEvento)
     return NextResponse.json({ success: true, data: eventos })
   } catch {
@@ -24,6 +25,12 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  // Requer sessão de gerenciador
+  const session = await auth()
+  if (!session?.managerId) {
+    return NextResponse.json({ success: false, error: 'Não autenticado.' }, { status: 401 })
+  }
+
   try {
     const body = await req.json()
     const { titulo, descricao, data, horaInicio, horaFim, local, endereco, vagasTotal, valorHora } = body
@@ -32,9 +39,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Campos obrigatórios faltando.' }, { status: 400 })
     }
 
-    const id = generateId()
-    const row = [id, titulo, descricao ?? '', data, horaInicio, horaFim, local, endereco,
-                 String(vagasTotal), '0', String(valorHora), 'aberto', new Date().toISOString()]
+    const id  = generateId()
+    // Coluna N (índice 13) = gerenciadorId  |  Coluna M (índice 12) = status  |  Coluna N = criadoEm
+    const row = [
+      id, titulo, descricao ?? '', data, horaInicio, horaFim,
+      local, endereco, String(vagasTotal), '0', String(valorHora),
+      'aberto', session.managerId, new Date().toISOString(),
+    ]
     await appendEvento(row)
 
     return NextResponse.json({ success: true, data: { id, titulo } }, { status: 201 })

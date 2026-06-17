@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { AppShell } from '@/components/Layout/AppShell'
-import { ScanLine, CalendarDays, UserPlus, ChevronRight, Sparkles } from 'lucide-react'
+import { auth } from '@/auth'
+import { ScanLine, CalendarDays, UserPlus, ChevronRight, Sparkles, ShieldCheck } from 'lucide-react'
 
 const quickActions = [
   {
@@ -32,7 +33,8 @@ const quickActions = [
   },
 ]
 
-export default function Home() {
+export default async function Home() {
+  const session = await auth()
   return (
     <AppShell>
       {/* ── Hero ──────────────────────────────────────────────────────── */}
@@ -89,12 +91,32 @@ export default function Home() {
         {/* Admin pill */}
         <div className="pt-2">
           <p className="text-xs font-bold text-slate-400 uppercase tracking-widest px-1 mb-3">Administração</p>
-          <Link href="/cadastrar-eventos"
-            className="animate-slide-up flex items-center gap-3 bg-slate-800 rounded-2xl px-4 py-3 transition-all active:scale-[0.98] hover:bg-slate-700 group">
-            <CalendarDays className="w-5 h-5 text-amber-400 shrink-0" />
-            <span className="flex-1 text-sm font-semibold text-white">Criar novo evento</span>
-            <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-slate-400 transition-colors" />
-          </Link>
+          {session?.isAdmin ? (
+            <div className="animate-slide-up space-y-2">
+              {/* Logged-in admin indicator */}
+              <div className="flex items-center gap-2 px-1 mb-1">
+                {session.user?.image && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={session.user.image} alt="" className="w-5 h-5 rounded-full ring-1 ring-amber-400/50" />
+                )}
+                <span className="text-xs text-emerald-400 font-semibold truncate">{session.user?.email}</span>
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0 ml-auto" />
+              </div>
+              <Link href="/cadastrar-eventos"
+                className="flex items-center gap-3 bg-slate-800 rounded-2xl px-4 py-3 transition-all active:scale-[0.98] hover:bg-slate-700 group">
+                <CalendarDays className="w-5 h-5 text-amber-400 shrink-0" />
+                <span className="flex-1 text-sm font-semibold text-white">Criar novo evento</span>
+                <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-slate-400 transition-colors" />
+              </Link>
+            </div>
+          ) : (
+            <Link href="/admin/login"
+              className="animate-slide-up flex items-center gap-3 bg-slate-800/60 border border-slate-700 rounded-2xl px-4 py-3 transition-all active:scale-[0.98] hover:bg-slate-800 group">
+              <ShieldCheck className="w-5 h-5 text-slate-500 shrink-0" />
+              <span className="flex-1 text-sm font-semibold text-slate-400">Entrar como administrador</span>
+              <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-slate-500 transition-colors" />
+            </Link>
+          )}
         </div>
       </main>
     </AppShell>

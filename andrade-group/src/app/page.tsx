@@ -1,65 +1,102 @@
 import Link from 'next/link'
-import { UserPlus, CalendarPlus, QrCode, Calendar } from 'lucide-react'
+import { AppShell } from '@/components/Layout/AppShell'
+import { ScanLine, CalendarDays, UserPlus, ChevronRight, Sparkles } from 'lucide-react'
 
-const links = [
+const quickActions = [
   {
     href: '/checkinout',
-    icon: QrCode,
     label: 'Check-in / Check-out',
-    desc: 'Registre sua entrada e saída no evento',
-    color: 'bg-amber-500',
+    desc: 'Registre sua presença no evento',
+    Icon: ScanLine,
+    accent: 'from-amber-400 to-amber-600',
+    iconBg: 'bg-amber-500',
+    featured: true,
+  },
+  {
+    href: '/eventos',
+    label: 'Ver Eventos',
+    desc: 'Confira os eventos disponíveis',
+    Icon: CalendarDays,
+    accent: '',
+    iconBg: 'bg-slate-700',
+    featured: false,
   },
   {
     href: '/cadastrar-dados',
-    icon: UserPlus,
     label: 'Cadastro de Freelancer',
-    desc: 'Crie seu perfil para trabalhar nos eventos',
-    color: 'bg-slate-700',
-  },
-  {
-    href: '/cadastrar-eventos',
-    icon: CalendarPlus,
-    label: 'Cadastrar Evento',
-    desc: 'Área administrativa — crie novos eventos',
-    color: 'bg-slate-700',
+    desc: 'Crie seu perfil para trabalhar',
+    Icon: UserPlus,
+    accent: '',
+    iconBg: 'bg-slate-700',
+    featured: false,
   },
 ]
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-slate-900 flex flex-col">
-      {/* Hero */}
-      <header className="px-6 pt-16 pb-10 text-center">
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-amber-500 mb-4 shadow-lg">
-          <Calendar className="w-8 h-8 text-white" />
+    <AppShell>
+      {/* ── Hero ──────────────────────────────────────────────────────── */}
+      <header className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white px-5 pt-14 pb-8">
+        <div className="pointer-events-none absolute -top-16 -right-12 w-56 h-56 rounded-full bg-amber-500/20 blur-3xl" />
+        <div className="pointer-events-none absolute bottom-0 left-4 w-40 h-40 rounded-full bg-amber-400/10 blur-2xl" />
+
+        <div className="relative flex items-start justify-between gap-4">
+          <div>
+            <div className="inline-flex items-center gap-1.5 bg-amber-500/20 text-amber-300 text-xs font-semibold px-2.5 py-1 rounded-full mb-3">
+              <Sparkles className="w-3 h-3" /> Plataforma de Freelancers
+            </div>
+            <h1 className="text-3xl font-black tracking-tight leading-tight">
+              Andrade<br />
+              <span className="text-amber-400">Group</span>
+            </h1>
+            <p className="text-slate-400 text-sm mt-2">Gestão de eventos e equipes</p>
+          </div>
+
+          {/* Logo mark */}
+          <div className="shrink-0 w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center shadow-lg shadow-amber-900/30">
+            <span className="text-white font-black text-xl">AG</span>
+          </div>
         </div>
-        <h1 className="text-3xl font-bold text-white">Andrade Group</h1>
-        <p className="text-slate-400 mt-2 text-sm">Gestão de freelancers e eventos</p>
       </header>
 
-      {/* Menu */}
-      <main className="flex-1 px-4 max-w-lg mx-auto w-full space-y-3 pb-10">
-        {links.map(({ href, icon: Icon, label, desc, color }) => (
-          <Link key={href} href={href}
-            className="flex items-center gap-4 bg-slate-800 hover:bg-slate-750 border border-slate-700 rounded-2xl p-4 transition-all active:scale-95 group">
-            <div className={`w-12 h-12 rounded-xl ${color} flex items-center justify-center shrink-0 shadow`}>
-              <Icon className="w-6 h-6 text-white" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold text-white text-sm">{label}</p>
-              <p className="text-xs text-slate-400 mt-0.5">{desc}</p>
-            </div>
-            <svg className="w-5 h-5 text-slate-500 group-hover:text-slate-300 transition-colors shrink-0"
-              fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </Link>
-        ))}
-      </main>
+      {/* ── Quick actions ─────────────────────────────────────────────── */}
+      <main className="flex-1 px-4 py-5 max-w-lg mx-auto w-full space-y-3">
+        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest px-1">Acesso rápido</p>
 
-      <footer className="text-center pb-6 text-xs text-slate-600">
-        Andrade Group © {new Date().getFullYear()}
-      </footer>
-    </div>
+        <div className="stagger space-y-3">
+          {quickActions.map(({ href, label, desc, Icon, iconBg, featured }) => (
+            <Link
+              key={href}
+              href={href}
+              className={`animate-slide-up flex items-center gap-4 rounded-2xl p-4 transition-all active:scale-[0.98] group
+                ${featured
+                  ? 'bg-gradient-to-r from-amber-500 to-amber-400 text-white shadow-lg shadow-amber-200'
+                  : 'bg-white border border-slate-100 shadow-sm hover:shadow-md text-slate-900'
+                }`}
+            >
+              <div className={`w-12 h-12 rounded-xl ${featured ? 'bg-white/20' : iconBg} flex items-center justify-center shrink-0`}>
+                <Icon className={`w-6 h-6 ${featured ? 'text-white' : 'text-white'}`} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className={`font-bold text-sm ${featured ? 'text-white' : 'text-slate-800'}`}>{label}</p>
+                <p className={`text-xs mt-0.5 ${featured ? 'text-amber-100' : 'text-slate-400'}`}>{desc}</p>
+              </div>
+              <ChevronRight className={`w-5 h-5 shrink-0 transition-transform group-hover:translate-x-0.5 ${featured ? 'text-white/70' : 'text-slate-300'}`} />
+            </Link>
+          ))}
+        </div>
+
+        {/* Admin pill */}
+        <div className="pt-2">
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest px-1 mb-3">Administração</p>
+          <Link href="/cadastrar-eventos"
+            className="animate-slide-up flex items-center gap-3 bg-slate-800 rounded-2xl px-4 py-3 transition-all active:scale-[0.98] hover:bg-slate-700 group">
+            <CalendarDays className="w-5 h-5 text-amber-400 shrink-0" />
+            <span className="flex-1 text-sm font-semibold text-white">Criar novo evento</span>
+            <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-slate-400 transition-colors" />
+          </Link>
+        </div>
+      </main>
+    </AppShell>
   )
 }

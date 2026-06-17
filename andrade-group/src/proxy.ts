@@ -1,12 +1,13 @@
 import { auth } from '@/auth'
 import { NextResponse } from 'next/server'
 
-// Rotas que exigem login de gerenciador
 const PROTECTED = ['/cadastrar-eventos', '/gerenciador']
+const PUBLIC    = ['/gerenciador/login']
 
 export default auth((req) => {
   const { pathname } = req.nextUrl
-  const isProtected  = PROTECTED.some(p => pathname.startsWith(p))
+  const isPublic    = PUBLIC.some(p => pathname.startsWith(p))
+  const isProtected = !isPublic && PROTECTED.some(p => pathname.startsWith(p))
 
   if (isProtected && !req.auth) {
     const loginUrl = new URL('/gerenciador/login', req.url)

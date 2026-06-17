@@ -19,12 +19,18 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     // Registra o gerenciador na planilha se ainda não existir.
     async jwt({ token, account, profile }) {
       if (account && profile?.email) {
-        const gerenciador = await getOrCreateGerenciador({
-          email: profile.email,
-          nome:  (profile as { name?: string }).name ?? profile.email,
-        })
-        token.managerId     = gerenciador.id
-        token.managerStatus = gerenciador.status
+        try {
+          const gerenciador = await getOrCreateGerenciador({
+            email: profile.email,
+            nome:  (profile as { name?: string }).name ?? profile.email,
+          })
+          token.managerId     = gerenciador.id
+          token.managerStatus = gerenciador.status
+        } catch (err) {
+          console.error('[auth] getOrCreateGerenciador failed:', err)
+          // Allows login even if Sheets fails — managerId will be undefined
+          // Check Vercel logs for the actual error message
+        }
       }
       return token
     },

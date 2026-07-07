@@ -13,8 +13,8 @@ export function rowToEvento(r: string[]): Evento {
     latitude:  r[8]  ? Number(r[8])  : undefined,
     longitude: r[9]  ? Number(r[9])  : undefined,
     equipes,
-    valorHora: Number(r[11]),
-    status: r[12] as Evento['status'],
+    valorHora: Number(r[11]) || 0,
+    status: (r[12] as Evento['status']) || 'aberto',
     gerenciadorId: r[13],
     createdAt: r[14],
   }
@@ -31,19 +31,26 @@ export async function GET(req: NextRequest) {
     }
     const rows = await getEventos()
     return NextResponse.json({ success: true, data: rows.slice(1).map(rowToEvento) })
-  } catch {
+  } catch (err) {
+    console.error('[GET /api/eventos]', err)
     return NextResponse.json({ success: false, error: 'Erro ao buscar eventos.' }, { status: 500 })
   }
 }
 
-export async function POST(req: NextRequest) {
-  const session = await auth()
-  if (!session?.managerId) {
-    return NextResponse.json({ success: false, error: 'Não autenticado.' }, { status: 401 })
+// Usando o wrapper auth() para garantir que o session é lido corretamente em Route Handlers
+export const POST = auth(async function (req) {
+  const managerId = req.auth?.managerId as string | undefined
+
+  if (!managerId) {
+    console.error('[POST /api/eventos] Sem managerId. Session:', JSON.stringify(req.auth))
+    return NextResponse.json(
+      { success: false, error: 'Não autenticado. Faça login novamente.' },
+      { status: 401 }
+    )
   }
 
   try {
-    const body = await req.json()
+    const body = await (req as NextRequest).json()
     const { titulo, descricao, data, horaInicio, horaFim, local, endereco,
             latitude, longitude, equipes } = body
 
@@ -63,13 +70,18 @@ export async function POST(req: NextRequest) {
       JSON.stringify(equipes),
       '',
       'aberto',
-      session.managerId,
+      managerId,
       new Date().toISOString(),
     ]
+
+    console.log('[POST /api/eventos] Salvando evento', id, 'para gerenciador', managerId)
     await appendEvento(row)
+    console.log('[POST /api/eventos] Evento salvo com sucesso:', id)
 
     return NextResponse.json({ success: true, data: { id, titulo } }, { status: 201 })
-  } catch {
-    return NextResponse.json({ success: false, error: 'Erro interno ao criar evento.' }, { status: 500 })
+  } catch (err) {
+    console.error('[POST /api/eventos] Erro ao salvar evento:', err)
+    const msg = err instanceof Error ? err.message : 'Erro interno ao criar evento.'
+    return NextResponse.json({ success: false, error: msg }, { status: 500 })
   }
-}
+})

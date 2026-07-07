@@ -7,7 +7,7 @@ import { Input }   from '@/components/ui/Input'
 import { Button }  from '@/components/ui/Button'
 import {
   CheckCircle2, Copy, CalendarDays, Clock,
-  MapPin, DollarSign, AlignLeft, Navigation, Users,
+  MapPin, DollarSign, AlignLeft, Search, Users,
 } from 'lucide-react'
 import { EquipeNome, TipoVaga } from '@/types'
 
@@ -21,19 +21,20 @@ const TIPOS: { key: TipoVaga; label: string }[] = [
   { key: 'freelancer',  label: 'Freelancer'  },
 ]
 
-type VagasMap = Record<string, string> // `${equipe}_${tipo}` → qty string
+type VagasMap   = Record<string, string>
+type ValoresMap = Record<string, string>
 
 interface BaseForm {
   titulo: string; descricao: string; data: string
-  horaInicio: string; horaFim: string; local: string
-  endereco: string; valorHora: string
+  horaInicio: string; horaFim: string; local: string; endereco: string
 }
 const emptyBase: BaseForm = {
   titulo: '', descricao: '', data: '', horaInicio: '',
-  horaFim: '', local: '', endereco: '', valorHora: '',
+  horaFim: '', local: '', endereco: '',
 }
 const emptyVagas = (): VagasMap =>
   Object.fromEntries(EQUIPES.flatMap(e => TIPOS.map(t => [`${e.key}_${t.key}`, '0'])))
+const emptyValores = (): ValoresMap => ({})
 
 function gerarLinks(eventoId: string, vagas: VagasMap) {
   const base = typeof window !== 'undefined' ? window.location.origin : ''
@@ -54,57 +55,78 @@ function gerarLinks(eventoId: string, vagas: VagasMap) {
 }
 
 export default function CadastrarEventosPage() {
-  const [form, setForm]       = useState<BaseForm>(emptyBase)
-  const [vagas, setVagas]     = useState<VagasMap>(emptyVagas())
-  const [lat, setLat]         = useState<number | null>(null)
-  const [lng, setLng]         = useState<number | null>(null)
-  const [gpsLoading, setGps]  = useState(false)
-  const [errors, setErrors]   = useState<Partial<Record<keyof BaseForm | 'vagas', string>>>({})
-  const [loading, setLoading] = useState(false)
+  const [form, setForm]         = useState<BaseForm>(emptyBase)
+  const [vagas, setVagas]       = useState<VagasMap>(emptyVagas())
+  const [valores, setValores]   = useState<ValoresMap>(emptyValores())
+  const [lat, setLat]           = useState<number | null>(null)
+  const [lng, setLng]           = useState<number | null>(null)
+  const [searchLoading, setSearchLoading] = useState(false)
+  const [errors, setErrors]     = useState<Record<string, string>>({})
+  const [loading, setLoading]   = useState(false)
   const [eventoId, setEventoId] = useState<string | null>(null)
-  const [copied, setCopied]   = useState<string | null>(null)
+  const [copied, setCopied]     = useState<string | null>(null)
 
   const set = (f: keyof BaseForm, v: string) => {
     setForm(p => ({ ...p, [f]: v }))
-    setErrors(p => ({ ...p, [f]: undefined }))
+    setErrors(p => { const n = { ...p }; delete n[f]; return n })
   }
 
   const setVaga = (equipe: EquipeNome, tipo: TipoVaga, v: string) =>
     setVagas(p => ({ ...p, [`${equipe}_${tipo}`]: v }))
 
-  const usarGPS = () => {
-    if (!navigator.geolocation) return
-    setGps(true)
-    navigator.geolocation.getCurrentPosition(
-      async pos => {
-        const { latitude, longitude } = pos.coords
-        setLat(latitude); setLng(longitude)
-        try {
-          const r = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`,
-            { headers: { 'Accept-Language': 'pt-BR' } }
-          )
-          const d = await r.json()
-          if (d.display_name) setForm(p => ({ ...p, endereco: d.display_name }))
-        } catch { /* sem reverse geocode, tudo bem */ }
-        setGps(false)
-      },
-      () => setGps(false),
-      { enableHighAccuracy: true, timeout: 10000 }
-    )
+  const setValor = (key: string, v: string) =>
+    setValores(p => ({ ...p, [key]: v }))
+
+  /* Combos ativas (vagas > 0) */
+  const activeCombos = EQUIPES.flatMap(e =>
+    TIPOS.filter(t => Number(vagas[`${e.key}_${t.key}`]) > 0)
+      .map(t => ({ equipe: e, tipo: t, key: `${e.key}_${t.key}` }))
+  )
+
+  /* Busca endereço pelo nome do local via Nominatim (forward geocoding) */
+  const buscarEndereco = async () => {
+    const termo = form.local.trim()
+    if (!termo) {
+      setErrors(p => ({ ...p, local: 'Preencha o nome do local antes de buscar' }))
+      return
+    }
+    setSearchLoading(true)
+    try {
+      const r = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(termo)}&format=json&limit=1`,
+        { headers: { 'Accept-Language': 'pt-BR' } }
+      )
+      const data = await r.json()
+      if (data[0]) {
+        setLat(Number(data[0].lat))
+        setLng(Number(data[0].lon))
+        if (data[0].display_name) {
+          setForm(p => ({ ...p, endereco: data[0].display_name }))
+          setErrors(p => { const n = { ...p }; delete n.endereco; return n })
+        }
+      } else {
+        setErrors(p => ({ ...p, endereco: 'Local não encontrado. Digite o endereço manualmente.' }))
+      }
+    } catch {
+      setErrors(p => ({ ...p, endereco: 'Erro na busca. Digite o endereço manualmente.' }))
+    }
+    setSearchLoading(false)
   }
 
   const validate = () => {
-    const e: typeof errors = {}
+    const e: Record<string, string> = {}
     if (!form.titulo.trim())    e.titulo     = 'Obrigatório'
     if (!form.data)             e.data       = 'Obrigatório'
     if (!form.horaInicio)       e.horaInicio = 'Obrigatório'
     if (!form.horaFim)          e.horaFim    = 'Obrigatório'
     if (!form.local.trim())     e.local      = 'Obrigatório'
     if (!form.endereco.trim())  e.endereco   = 'Obrigatório'
-    if (!form.valorHora || Number(form.valorHora) <= 0) e.valorHora = 'Valor inválido'
-    const temVaga = EQUIPES.some(e2 => TIPOS.some(t => Number(vagas[`${e2.key}_${t.key}`]) > 0))
-    if (!temVaga) e.vagas = 'Informe ao menos uma equipe com vagas'
+    if (activeCombos.length === 0) e.vagas   = 'Informe ao menos uma equipe com vagas'
+    activeCombos.forEach(({ key, equipe, tipo }) => {
+      if (!valores[key] || Number(valores[key]) <= 0) {
+        e[`valor_${key}`] = `Informe o valor da diária para ${equipe.label} / ${tipo.label}`
+      }
+    })
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -119,12 +141,13 @@ export default function CadastrarEventosPage() {
           equipe: e.key, tipo: t.key,
           vagas: Number(vagas[`${e.key}_${t.key}`]),
           vagasOcupadas: 0,
+          valorDiaria: Number(valores[`${e.key}_${t.key}`] ?? 0),
         })).filter(x => x.vagas > 0)
       )
-      const res  = await fetch('/api/eventos', {
+      const res = await fetch('/api/eventos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, valorHora: Number(form.valorHora), latitude: lat, longitude: lng, equipes }),
+        body: JSON.stringify({ ...form, latitude: lat, longitude: lng, equipes }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Erro ao criar evento.')
@@ -143,8 +166,8 @@ export default function CadastrarEventosPage() {
 
   /* ── Sucesso ── */
   if (eventoId) {
-    const regLinks   = gerarLinks(eventoId, vagas)
-    const origin     = typeof window !== 'undefined' ? window.location.origin : ''
+    const regLinks    = gerarLinks(eventoId, vagas)
+    const origin      = typeof window !== 'undefined' ? window.location.origin : ''
     const checkinUrl  = `${origin}/checkin/${eventoId}`
     const checkoutUrl = `${origin}/checkout/${eventoId}`
 
@@ -160,7 +183,6 @@ export default function CadastrarEventosPage() {
             <p className="text-slate-500 text-xs">Copie os links abaixo e envie para as equipes</p>
           </div>
 
-          {/* Links de cadastro */}
           <Card>
             <CardSection title="Links de Cadastro por Equipe">
               <div className="space-y-2">
@@ -183,7 +205,6 @@ export default function CadastrarEventosPage() {
             </CardSection>
           </Card>
 
-          {/* Links de check-in / check-out */}
           <Card>
             <CardSection title="Links de Presença">
               {[
@@ -207,10 +228,13 @@ export default function CadastrarEventosPage() {
           </Card>
 
           <div className="flex gap-3">
-            <Button variant="outline" className="flex-1" onClick={() => { setEventoId(null); setForm(emptyBase); setVagas(emptyVagas()) }}>
+            <Button variant="outline" className="flex-1" onClick={() => {
+              setEventoId(null); setForm(emptyBase); setVagas(emptyVagas()); setValores(emptyValores())
+            }}>
               Novo evento
             </Button>
-            <Button variant="secondary" className="flex-1" onClick={() => window.location.href = `/gerenciador/eventos/${eventoId}`}>
+            <Button variant="secondary" className="flex-1"
+              onClick={() => window.location.href = `/gerenciador/eventos/${eventoId}`}>
               Ver evento
             </Button>
           </div>
@@ -261,7 +285,7 @@ export default function CadastrarEventosPage() {
 
           <Card>
             <CardSection title="Local">
-              <Input label="Nome do local" placeholder="Ex: Hotel Maksoud Plaza"
+              <Input label="Nome do local" placeholder="Ex: Estádio Mané Garrincha"
                 value={form.local} onChange={e => set('local', e.target.value)}
                 error={errors.local} icon={<MapPin className="w-4 h-4" />} />
               <div className="flex flex-col gap-1.5">
@@ -270,17 +294,17 @@ export default function CadastrarEventosPage() {
                 </label>
                 <div className="flex gap-2">
                   <input
-                    placeholder="Rua, número, bairro, cidade"
+                    placeholder="Clique em 🔍 para buscar pelo nome ou digite manualmente"
                     value={form.endereco}
                     onChange={e => set('endereco', e.target.value)}
                     className={`flex-1 rounded-2xl border px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-400 transition-shadow shadow-sm ${errors.endereco ? 'border-red-300 bg-red-50/30' : 'border-slate-200'}`}
                   />
-                  <button type="button" onClick={usarGPS} disabled={gpsLoading}
-                    title="Usar localização atual"
+                  <button type="button" onClick={buscarEndereco} disabled={searchLoading}
+                    title="Buscar endereço pelo nome do local"
                     className="shrink-0 w-12 h-12 rounded-2xl bg-amber-500 hover:bg-amber-400 text-white flex items-center justify-center shadow-md shadow-amber-200 disabled:opacity-60 transition-all">
-                    {gpsLoading
+                    {searchLoading
                       ? <svg className="animate-spin w-5 h-5" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
-                      : <Navigation className="w-5 h-5" />}
+                      : <Search className="w-5 h-5" />}
                   </button>
                 </div>
                 {errors.endereco && <p className="text-xs text-red-500">⚠ {errors.endereco}</p>}
@@ -300,9 +324,7 @@ export default function CadastrarEventosPage() {
               <p className="text-xs text-slate-400 -mt-1 mb-2">
                 Informe quantas vagas por equipe e tipo. Deixe 0 para não gerar link.
               </p>
-              {errors.vagas && (
-                <p className="text-xs text-red-500 mb-2">⚠ {errors.vagas}</p>
-              )}
+              {errors.vagas && <p className="text-xs text-red-500 mb-2">⚠ {errors.vagas}</p>}
               <div className="overflow-x-auto -mx-1">
                 <table className="w-full text-sm min-w-[260px]">
                   <thead>
@@ -313,7 +335,7 @@ export default function CadastrarEventosPage() {
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="space-y-1">
+                  <tbody>
                     {EQUIPES.map(e => (
                       <tr key={e.key}>
                         <td className="py-1.5 pl-1">
@@ -340,14 +362,39 @@ export default function CadastrarEventosPage() {
             </CardSection>
           </Card>
 
-          <Card>
-            <CardSection title="Pagamento">
-              <Input label="Valor por hora (R$)" type="number" min="0" step="0.01" placeholder="25,00"
-                value={form.valorHora} onChange={e => set('valorHora', e.target.value)}
-                error={errors.valorHora} inputMode="decimal"
-                icon={<DollarSign className="w-4 h-4" />} />
-            </CardSection>
-          </Card>
+          {/* Pagamento — campos dinâmicos por combo ativa */}
+          {activeCombos.length > 0 && (
+            <Card>
+              <CardSection title="Pagamento">
+                <p className="text-xs text-slate-400 -mt-1 mb-3">
+                  Informe o valor da diária para cada equipe e tipo com vagas ativas.
+                </p>
+                <div className="space-y-3">
+                  {activeCombos.map(({ equipe, tipo, key }) => (
+                    <div key={key} className="flex flex-col gap-1.5">
+                      <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
+                        <DollarSign className="w-3.5 h-3.5 text-amber-500" />
+                        Diária — {equipe.label} / {tipo.label}
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm">R$</span>
+                        <input
+                          type="number" min="0" step="0.01" inputMode="decimal"
+                          placeholder="0,00"
+                          value={valores[key] ?? ''}
+                          onChange={ev => setValor(key, ev.target.value)}
+                          className={`w-full rounded-2xl border pl-10 pr-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-400 transition-shadow shadow-sm ${errors[`valor_${key}`] ? 'border-red-300 bg-red-50/30' : 'border-slate-200'}`}
+                        />
+                      </div>
+                      {errors[`valor_${key}`] && (
+                        <p className="text-xs text-red-500">⚠ {errors[`valor_${key}`]}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </CardSection>
+            </Card>
+          )}
 
           <Button type="submit" size="lg" loading={loading}>
             Publicar Evento

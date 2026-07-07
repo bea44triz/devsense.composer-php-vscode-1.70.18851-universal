@@ -6,6 +6,7 @@ export interface EquipeVaga {
   tipo:           TipoVaga
   vagas:          number
   vagasOcupadas:  number
+  valorDiaria?:   number
 }
 
 export interface Evento {

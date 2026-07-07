@@ -45,9 +45,9 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
     const { titulo, descricao, data, horaInicio, horaFim, local, endereco,
-            latitude, longitude, equipes, valorHora } = body
+            latitude, longitude, equipes } = body
 
-    if (!titulo || !data || !horaInicio || !horaFim || !local || !endereco || !valorHora) {
+    if (!titulo || !data || !horaInicio || !horaFim || !local || !endereco) {
       return NextResponse.json({ success: false, error: 'Campos obrigatórios faltando.' }, { status: 400 })
     }
     if (!equipes || !Array.isArray(equipes) || equipes.length === 0) {
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
       latitude  != null ? String(latitude)  : '',
       longitude != null ? String(longitude) : '',
       JSON.stringify(equipes),
-      String(valorHora),
+      '',
       'aberto',
       session.managerId,
       new Date().toISOString(),

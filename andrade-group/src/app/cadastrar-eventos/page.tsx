@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { AppShell }   from '@/components/Layout/AppShell'
 import { PageHeader } from '@/components/Layout/PageHeader'
 import { Card, CardSection } from '@/components/ui/Card'
@@ -7,9 +7,15 @@ import { Input }   from '@/components/ui/Input'
 import { Button }  from '@/components/ui/Button'
 import {
   CheckCircle2, Copy, CalendarDays, Clock,
-  MapPin, DollarSign, AlignLeft, Search, Users,
+  MapPin, DollarSign, AlignLeft, Users,
 } from 'lucide-react'
 import { EquipeNome, TipoVaga } from '@/types'
+
+interface NominatimResult {
+  display_name: string
+  lat: string
+  lon: string
+}
 
 const EQUIPES: { key: EquipeNome; label: string }[] = [
   { key: 'brigadistas', label: 'Brigadistas' },
@@ -60,7 +66,9 @@ export default function CadastrarEventosPage() {
   const [valores, setValores]   = useState<ValoresMap>(emptyValores())
   const [lat, setLat]           = useState<number | null>(null)
   const [lng, setLng]           = useState<number | null>(null)
-  const [searchLoading, setSearchLoading] = useState(false)
+  const [sugestoes, setSugestoes] = useState<NominatimResult[]>([])
+  const [showSug, setShowSug]   = useState(false)
+  const debounceRef             = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [errors, setErrors]     = useState<Record<string, string>>({})
   const [loading, setLoading]   = useState(false)
   const [eventoId, setEventoId] = useState<string | null>(null)
@@ -83,34 +91,30 @@ export default function CadastrarEventosPage() {
       .map(t => ({ equipe: e, tipo: t, key: `${e.key}_${t.key}` }))
   )
 
-  /* Busca endereço pelo nome do local via Nominatim (forward geocoding) */
-  const buscarEndereco = async () => {
-    const termo = form.local.trim()
-    if (!termo) {
-      setErrors(p => ({ ...p, local: 'Preencha o nome do local antes de buscar' }))
-      return
-    }
-    setSearchLoading(true)
-    try {
-      const r = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(termo)}&format=json&limit=1`,
-        { headers: { 'Accept-Language': 'pt-BR' } }
-      )
-      const data = await r.json()
-      if (data[0]) {
-        setLat(Number(data[0].lat))
-        setLng(Number(data[0].lon))
-        if (data[0].display_name) {
-          setForm(p => ({ ...p, endereco: data[0].display_name }))
-          setErrors(p => { const n = { ...p }; delete n.endereco; return n })
-        }
-      } else {
-        setErrors(p => ({ ...p, endereco: 'Local não encontrado. Digite o endereço manualmente.' }))
-      }
-    } catch {
-      setErrors(p => ({ ...p, endereco: 'Erro na busca. Digite o endereço manualmente.' }))
-    }
-    setSearchLoading(false)
+  /* Autocomplete de endereço via Nominatim */
+  const onEnderecoChange = (v: string) => {
+    set('endereco', v)
+    setLat(null); setLng(null)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    if (v.length < 3) { setSugestoes([]); setShowSug(false); return }
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const r = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(v)}&format=json&limit=5`,
+          { headers: { 'Accept-Language': 'pt-BR' } }
+        )
+        const data: NominatimResult[] = await r.json()
+        setSugestoes(data)
+        setShowSug(data.length > 0)
+      } catch { /* ignore */ }
+    }, 400)
+  }
+
+  const selecionarSugestao = (s: NominatimResult) => {
+    setForm(p => ({ ...p, endereco: s.display_name }))
+    setLat(Number(s.lat)); setLng(Number(s.lon))
+    setSugestoes([]); setShowSug(false)
+    setErrors(p => { const n = { ...p }; delete n.endereco; return n })
   }
 
   const validate = () => {
@@ -292,20 +296,30 @@ export default function CadastrarEventosPage() {
                 <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
                   Endereço
                 </label>
-                <div className="flex gap-2">
+                <div className="relative">
                   <input
-                    placeholder="Clique em 🔍 para buscar pelo nome ou digite manualmente"
+                    placeholder="Digite o endereço e selecione na lista"
                     value={form.endereco}
-                    onChange={e => set('endereco', e.target.value)}
-                    className={`flex-1 rounded-2xl border px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-400 transition-shadow shadow-sm ${errors.endereco ? 'border-red-300 bg-red-50/30' : 'border-slate-200'}`}
+                    onChange={e => onEnderecoChange(e.target.value)}
+                    onBlur={() => setTimeout(() => setShowSug(false), 200)}
+                    onFocus={() => sugestoes.length > 0 && setShowSug(true)}
+                    autoComplete="off"
+                    className={`w-full rounded-2xl border px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-400 transition-shadow shadow-sm ${errors.endereco ? 'border-red-300 bg-red-50/30' : 'border-slate-200'}`}
                   />
-                  <button type="button" onClick={buscarEndereco} disabled={searchLoading}
-                    title="Buscar endereço pelo nome do local"
-                    className="shrink-0 w-12 h-12 rounded-2xl bg-amber-500 hover:bg-amber-400 text-white flex items-center justify-center shadow-md shadow-amber-200 disabled:opacity-60 transition-all">
-                    {searchLoading
-                      ? <svg className="animate-spin w-5 h-5" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
-                      : <Search className="w-5 h-5" />}
-                  </button>
+                  {showSug && sugestoes.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
+                      {sugestoes.map((s, i) => (
+                        <button
+                          key={i} type="button"
+                          onMouseDown={() => selecionarSugestao(s)}
+                          className="w-full text-left px-4 py-3 text-xs text-slate-700 hover:bg-amber-50 border-b border-slate-50 last:border-0 flex items-start gap-2"
+                        >
+                          <MapPin className="w-3.5 h-3.5 text-amber-500 mt-0.5 shrink-0" />
+                          <span className="line-clamp-2">{s.display_name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 {errors.endereco && <p className="text-xs text-red-500">⚠ {errors.endereco}</p>}
                 {lat && lng && (

@@ -1,14 +1,14 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, ScanLine, CalendarDays, UserCircle } from 'lucide-react'
+import { Home, CalendarDays, UserCircle, PlusCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const nav = [
-  { href: '/',           label: 'Início',    Icon: Home         },
-  { href: '/checkinout', label: 'Check-in',  Icon: ScanLine     },
-  { href: '/eventos',    label: 'Eventos',   Icon: CalendarDays },
-  { href: '/perfil',     label: 'Perfil',    Icon: UserCircle   },
+  { href: '/',                    label: 'Início',   Icon: Home         },
+  { href: '/gerenciador/eventos', label: 'Eventos',  Icon: CalendarDays },
+  { href: '/cadastrar-eventos',   label: 'Criar',    Icon: PlusCircle   },
+  { href: '/perfil',              label: 'Perfil',   Icon: UserCircle   },
 ]
 
 export function BottomNav() {

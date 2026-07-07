@@ -1,16 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getEventoById } from '@/lib/google-sheets'
-import { Evento } from '@/types'
-
-function rowToEvento(r: string[]): Evento {
-  return {
-    id: r[0], titulo: r[1], descricao: r[2], data: r[3],
-    horaInicio: r[4], horaFim: r[5], local: r[6],
-    endereco: r[7], vagasTotal: Number(r[8]), vagasOcupadas: Number(r[9]),
-    valorHora: Number(r[10]), status: r[11] as Evento['status'],
-    createdAt: r[12],
-  }
-}
+import { rowToEvento } from '@/app/api/eventos/route'
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params

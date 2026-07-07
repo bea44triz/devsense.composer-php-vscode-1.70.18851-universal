@@ -1,10 +1,3 @@
-/**
- * Google Sheets client — always uses the app's Service Account.
- *
- * The service account email must have Editor access to the spreadsheet.
- * Individual managers authenticate via Google OAuth (for identity only);
- * their personal Google tokens are never used to access the sheet.
- */
 import { google } from 'googleapis'
 
 const SPREADSHEET_ID = process.env.GOOGLE_SHEETS_ID!
@@ -17,8 +10,6 @@ function getSheetsClient() {
   })
   return google.sheets({ version: 'v4', auth })
 }
-
-// ── Generic helpers ────────────────────────────────────────────────────────────
 
 export async function sheetAppend(range: string, row: string[]) {
   const sheets = getSheetsClient()
@@ -47,7 +38,7 @@ export async function sheetUpdate(range: string, value: string | number) {
 }
 
 // ── Gerenciadores ──────────────────────────────────────────────────────────────
-// Aba: Gerenciadores | Colunas: id | nome | email | status | criadoEm
+// Aba: Gerenciadores | id | nome | email | status | criadoEm
 
 export async function getGerenciadores() {
   return sheetGet('Gerenciadores!A:E')
@@ -62,28 +53,13 @@ export async function appendGerenciador(row: string[]) {
   return sheetAppend('Gerenciadores!A:E', row)
 }
 
-// ── Freelancers ────────────────────────────────────────────────────────────────
-// Aba: Freelancers | Colunas: id | nome | cpf | telefone | email | pix | documentoUrl | criadoEm | status
-
-export async function getFreelancers() {
-  return sheetGet('Freelancers!A:I')
-}
-
-export async function getFreelancerByCpf(cpf: string) {
-  const rows = await getFreelancers()
-  return rows.find(r => r[2] === cpf) ?? null
-}
-
-export async function appendFreelancer(row: string[]) {
-  return sheetAppend('Freelancers!A:I', row)
-}
-
 // ── Eventos ────────────────────────────────────────────────────────────────────
-// Aba: Eventos | Colunas: id | titulo | descricao | data | horaInicio | horaFim |
-//               local | endereco | vagasTotal | vagasOcupadas | valorHora | status | gerenciadorId | criadoEm
+// Aba: Eventos | A:id | B:titulo | C:descricao | D:data | E:horaInicio | F:horaFim |
+//               G:local | H:endereco | I:latitude | J:longitude | K:equipes(JSON) |
+//               L:valorHora | M:status | N:gerenciadorId | O:criadoEm
 
 export async function getEventos() {
-  return sheetGet('Eventos!A:N')
+  return sheetGet('Eventos!A:O')
 }
 
 export async function getEventoById(id: string) {
@@ -91,35 +67,42 @@ export async function getEventoById(id: string) {
   return rows.find(r => r[0] === id) ?? null
 }
 
-export async function appendEvento(row: string[]) {
-  return sheetAppend('Eventos!A:N', row)
+export async function getEventosByGerenciador(gerenciadorId: string) {
+  const rows = await getEventos()
+  return rows.filter(r => r[13] === gerenciadorId)
 }
 
-export async function updateVagasOcupadas(eventoId: string, novoValor: number) {
-  const rows = await getEventos()
-  const idx  = rows.findIndex(r => r[0] === eventoId)
-  if (idx === -1) throw new Error('Evento não encontrado')
-  return sheetUpdate(`Eventos!J${idx + 1}`, novoValor)
+export async function appendEvento(row: string[]) {
+  return sheetAppend('Eventos!A:O', row)
 }
 
 // ── Inscrições ─────────────────────────────────────────────────────────────────
+// Aba: Inscricoes | A:id | B:eventoId | C:nome | D:cpf | E:telefone | F:email |
+//                  G:pixTipo | H:pixChave | I:equipe | J:tipo | K:criadoEm
 
 export async function getInscricoesByEvento(eventoId: string) {
-  const rows = await sheetGet('Inscricoes!A:H')
+  const rows = await sheetGet('Inscricoes!A:K')
   return rows.filter(r => r[1] === eventoId)
 }
 
+export async function getInscricaoByCpfEvento(cpf: string, eventoId: string) {
+  const rows = await sheetGet('Inscricoes!A:K')
+  return rows.find(r => r[3] === cpf && r[1] === eventoId) ?? null
+}
+
 export async function appendInscricao(row: string[]) {
-  return sheetAppend('Inscricoes!A:H', row)
+  return sheetAppend('Inscricoes!A:K', row)
 }
 
 // ── Check-in / Check-out ───────────────────────────────────────────────────────
+// Aba: CheckInOut | A:id | B:eventoId | C:cpf | D:nome | E:equipe | F:tipo |
+//                  G:tipoRegistro | H:latitude | I:longitude | J:accuracy | K:timestamp
 
 export async function appendCheckInOut(row: string[]) {
-  return sheetAppend('CheckInOut!A:J', row)
+  return sheetAppend('CheckInOut!A:K', row)
 }
 
 export async function getCheckInOutByEvento(eventoId: string) {
-  const rows = await sheetGet('CheckInOut!A:J')
+  const rows = await sheetGet('CheckInOut!A:K')
   return rows.filter(r => r[1] === eventoId)
 }

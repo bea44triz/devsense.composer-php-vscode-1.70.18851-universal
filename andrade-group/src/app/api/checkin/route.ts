@@ -1,20 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { appendCheckInOut, getEventoById } from '@/lib/google-sheets'
+import { appendCheckInOut, getCheckInOutByEvento, getInscricaoByCpfEvento, getEventoById } from '@/lib/google-sheets'
 import { generateId } from '@/lib/utils'
 
 export async function POST(req: NextRequest) {
   try {
-    const { tipo, freelancerId, eventoId, latitude, longitude, accuracy, foto } = await req.json()
+    const { tipoRegistro, cpf, eventoId, latitude, longitude, accuracy } = await req.json()
 
-    if (!tipo || !freelancerId || !eventoId || latitude == null || longitude == null) {
+    if (!tipoRegistro || !cpf || !eventoId || latitude == null || longitude == null) {
       return NextResponse.json(
-        { success: false, error: 'tipo, freelancerId, eventoId, latitude e longitude são obrigatórios.' },
+        { success: false, error: 'tipoRegistro, cpf, eventoId, latitude e longitude são obrigatórios.' },
         { status: 400 }
       )
     }
 
-    if (!['checkin', 'checkout'].includes(tipo)) {
-      return NextResponse.json({ success: false, error: 'tipo deve ser "checkin" ou "checkout".' }, { status: 400 })
+    if (!['checkin', 'checkout'].includes(tipoRegistro)) {
+      return NextResponse.json({ success: false, error: 'tipoRegistro deve ser "checkin" ou "checkout".' }, { status: 400 })
     }
 
     const eventoRow = await getEventoById(eventoId)
@@ -22,16 +22,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Evento não encontrado.' }, { status: 404 })
     }
 
-    // Em produção: enviar foto (base64) ao Google Drive/S3 e salvar URL
-    const fotoUrl = foto ? `data:image/jpeg;base64,pendente` : ''
+    const inscricao = await getInscricaoByCpfEvento(cpf, eventoId)
+    const nome   = inscricao ? inscricao[2] : ''
+    const equipe = inscricao ? inscricao[8] : ''
+    const tipo   = inscricao ? inscricao[9] : ''
 
-    const id = generateId()
+    const id        = generateId()
     const timestamp = new Date().toISOString()
-    const row = [id, eventoId, freelancerId, '', tipo,
-                 String(latitude), String(longitude), String(accuracy ?? ''), fotoUrl, timestamp]
+    const row = [
+      id, eventoId, cpf, nome, equipe, tipo, tipoRegistro,
+      String(latitude), String(longitude), String(accuracy ?? ''), timestamp,
+    ]
     await appendCheckInOut(row)
 
-    return NextResponse.json({ success: true, data: { id, tipo, timestamp } }, { status: 201 })
+    return NextResponse.json({ success: true, data: { id, tipoRegistro, timestamp, nome } }, { status: 201 })
   } catch {
     return NextResponse.json({ success: false, error: 'Erro interno ao registrar.' }, { status: 500 })
   }
@@ -42,14 +46,13 @@ export async function GET(req: NextRequest) {
   if (!eventoId) {
     return NextResponse.json({ success: false, error: 'eventoId obrigatório.' }, { status: 400 })
   }
-
   try {
-    const { getCheckInOutByEvento } = await import('@/lib/google-sheets')
     const rows = await getCheckInOutByEvento(eventoId)
-    const registros = rows.map((r) => ({
-      id: r[0], eventoId: r[1], freelancerId: r[2], freelancerNome: r[3],
-      tipo: r[4], latitude: Number(r[5]), longitude: Number(r[6]),
-      accuracy: Number(r[7]), fotoUrl: r[8], timestamp: r[9],
+    const registros = rows.map(r => ({
+      id: r[0], eventoId: r[1], cpf: r[2], nome: r[3],
+      equipe: r[4], tipo: r[5], tipoRegistro: r[6],
+      latitude: Number(r[7]), longitude: Number(r[8]),
+      accuracy: Number(r[9]), timestamp: r[10],
     }))
     return NextResponse.json({ success: true, data: registros })
   } catch {

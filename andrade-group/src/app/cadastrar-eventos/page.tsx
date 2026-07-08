@@ -10,6 +10,7 @@ import {
   MapPin, DollarSign, AlignLeft, Users,
 } from 'lucide-react'
 import { EquipeNome, TipoVaga } from '@/types'
+import { criarEvento } from '@/app/actions/eventos'
 
 interface NominatimResult {
   display_name: string
@@ -148,14 +149,9 @@ export default function CadastrarEventosPage() {
           valorDiaria: Number(valores[`${e.key}_${t.key}`] ?? 0),
         })).filter(x => x.vagas > 0)
       )
-      const res = await fetch('/api/eventos', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, latitude: lat, longitude: lng, equipes }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? 'Erro ao criar evento.')
-      setEventoId(data.data.id)
+      const result = await criarEvento({ ...form, latitude: lat, longitude: lng, equipes })
+      if (!result.success) throw new Error(result.error)
+      setEventoId(result.data.id)
     } catch (err) {
       setErrors({ titulo: err instanceof Error ? err.message : 'Erro inesperado.' })
     } finally {

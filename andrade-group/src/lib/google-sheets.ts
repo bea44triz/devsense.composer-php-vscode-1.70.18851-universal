@@ -114,10 +114,10 @@ export async function appendInscricao(row: string[]) {
 //                  G:tipoRegistro | H:latitude | I:longitude | J:accuracy | K:timestamp
 
 export async function appendCheckInOut(row: string[]) {
-  return sheetWriteRow('CheckInOut', 'K', row)
+  return sheetWriteRow('CheckInOut', 'L', row)
 }
 
 export async function getCheckInOutByEvento(eventoId: string) {
-  const rows = await sheetGet('CheckInOut!A:K')
+  const rows = await sheetGet('CheckInOut!A:L')
   return rows.filter(r => r[1] === eventoId)
 }

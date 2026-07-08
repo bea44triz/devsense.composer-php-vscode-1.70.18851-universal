@@ -19,7 +19,7 @@ export default function CheckoutPage() {
   const [accuracy, setAcc]    = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
   const [erro, setErro]       = useState<string | null>(null)
-  const [resultado, setRes]   = useState<{ timestamp: string; nome: string } | null>(null)
+  const [resultado, setRes]   = useState<{ timestamp: string; nome: string; local: string } | null>(null)
 
   const videoRef  = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -69,7 +69,7 @@ export default function CheckoutPage() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Erro ao registrar.')
-      setRes({ timestamp: data.data.timestamp, nome: data.data.nome })
+      setRes({ timestamp: data.data.timestamp, nome: data.data.nome, local: data.data.localRegistro ?? '' })
       setStep('sucesso')
     } catch (err) {
       setErro(err instanceof Error ? err.message : 'Erro inesperado.')
@@ -104,6 +104,12 @@ export default function CheckoutPage() {
             </div>
             <h2 className="text-2xl font-black text-slate-800">Check-out feito{nomeFmt}!</h2>
             <p className="text-slate-500 text-sm">{dataFmt}</p>
+            {resultado.local && (
+              <p className="text-xs text-slate-400 max-w-xs text-center flex items-start gap-1">
+                <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+                {resultado.local}
+              </p>
+            )}
           </div>
         )}
 

@@ -42,17 +42,18 @@ export interface Inscricao {
 }
 
 export interface CheckInOut {
-  id:            string
-  eventoId:      string
-  cpf:           string
-  nome:          string
-  equipe:        string
-  tipo:          string
-  tipoRegistro:  'checkin' | 'checkout'
-  latitude:      number
-  longitude:     number
-  accuracy?:     number
-  timestamp:     string
+  id:             string
+  eventoId:       string
+  cpf:            string
+  nome:           string
+  equipe:         string
+  tipo:           string
+  tipoRegistro:   'checkin' | 'checkout'
+  localRegistro:  string
+  latitude:       number
+  longitude:      number
+  accuracy?:      number
+  timestamp:      string
 }
 
 export interface ApiResponse<T> {

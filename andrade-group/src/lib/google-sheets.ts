@@ -17,8 +17,23 @@ export async function sheetAppend(range: string, row: string[]) {
     spreadsheetId: SPREADSHEET_ID,
     range,
     valueInputOption: 'USER_ENTERED',
+    insertDataOption: 'INSERT_ROWS',
     requestBody: { values: [row] },
   })
+}
+
+// Writes a row at an explicit row number (bypasses append table-detection).
+async function sheetWriteRow(sheetName: string, lastCol: string, row: string[]) {
+  const existing = await sheetGet(`${sheetName}!A:A`)
+  const nextRow  = existing.length + 1
+  const sheets   = getSheetsClient()
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: SPREADSHEET_ID,
+    range: `${sheetName}!A${nextRow}:${lastCol}${nextRow}`,
+    valueInputOption: 'USER_ENTERED',
+    requestBody: { values: [row] },
+  })
+  return nextRow
 }
 
 export async function sheetGet(range: string): Promise<string[][]> {
@@ -73,7 +88,7 @@ export async function getEventosByGerenciador(gerenciadorId: string) {
 }
 
 export async function appendEvento(row: string[]) {
-  return sheetAppend('Eventos!A:O', row)
+  return sheetWriteRow('Eventos', 'O', row)
 }
 
 // ── Inscrições ─────────────────────────────────────────────────────────────────
@@ -91,7 +106,7 @@ export async function getInscricaoByCpfEvento(cpf: string, eventoId: string) {
 }
 
 export async function appendInscricao(row: string[]) {
-  return sheetAppend('Inscricoes!A:K', row)
+  return sheetWriteRow('Inscricoes', 'K', row)
 }
 
 // ── Check-in / Check-out ───────────────────────────────────────────────────────
@@ -99,7 +114,7 @@ export async function appendInscricao(row: string[]) {
 //                  G:tipoRegistro | H:latitude | I:longitude | J:accuracy | K:timestamp
 
 export async function appendCheckInOut(row: string[]) {
-  return sheetAppend('CheckInOut!A:K', row)
+  return sheetWriteRow('CheckInOut', 'K', row)
 }
 
 export async function getCheckInOutByEvento(eventoId: string) {

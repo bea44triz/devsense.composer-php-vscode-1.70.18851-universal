@@ -6,7 +6,7 @@ import { AppShell }    from '@/components/Layout/AppShell'
 import { PageHeader }  from '@/components/Layout/PageHeader'
 import { Card, CardSection } from '@/components/ui/Card'
 import { LinkCopy }    from '@/components/ui/LinkCopy'
-import { CalendarDays, Clock, MapPin, DollarSign, Users } from 'lucide-react'
+import { CalendarDays, MapPin, DollarSign, Users } from 'lucide-react'
 
 const EQUIPE_LABELS: Record<string, string> = {
   brigadistas: 'Brigadistas',
@@ -47,7 +47,6 @@ export default async function EventoDetailPage({ params }: { params: Promise<{ i
               {[
                 [<CalendarDays key="d" className="w-4 h-4 text-amber-500" />, `${dataFmt} · ${evento.horaInicio}–${evento.horaFim}`],
                 [<MapPin       key="m" className="w-4 h-4 text-amber-500" />, `${evento.local} · ${evento.endereco}`],
-                [<DollarSign   key="$" className="w-4 h-4 text-amber-500" />, `R$ ${evento.valorHora}/h`],
               ].map(([icon, text], i) => (
                 <div key={i} className="flex items-start gap-2.5">
                   <span className="shrink-0 mt-0.5">{icon}</span>
@@ -92,17 +91,25 @@ export default async function EventoDetailPage({ params }: { params: Promise<{ i
 
         <Card>
           <CardSection title="Equipes">
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               {evento.equipes.filter(e => e.vagas > 0).map(e => (
                 <div key={`${e.equipe}_${e.tipo}`}
-                  className="flex items-center justify-between text-sm">
+                  className="flex items-center justify-between text-sm bg-slate-50 rounded-xl px-3 py-2.5">
                   <div className="flex items-center gap-2">
                     <Users className="w-3.5 h-3.5 text-amber-500" />
-                    <span className="text-slate-700 font-medium">
-                      {EQUIPE_LABELS[e.equipe] ?? e.equipe} · {TIPO_LABELS[e.tipo] ?? e.tipo}
-                    </span>
+                    <div>
+                      <span className="text-slate-700 font-semibold text-xs">
+                        {EQUIPE_LABELS[e.equipe] ?? e.equipe} · {TIPO_LABELS[e.tipo] ?? e.tipo}
+                      </span>
+                      {e.valorDiaria != null && e.valorDiaria > 0 && (
+                        <p className="text-[10px] text-slate-400 flex items-center gap-0.5 mt-0.5">
+                          <DollarSign className="w-2.5 h-2.5" />
+                          Diária: R$ {e.valorDiaria.toFixed(2).replace('.', ',')}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  <span className="text-xs font-mono bg-slate-100 px-2 py-0.5 rounded-full text-slate-600">
+                  <span className="text-xs font-mono bg-white border border-slate-200 px-2 py-0.5 rounded-full text-slate-600">
                     {e.vagasOcupadas}/{e.vagas}
                   </span>
                 </div>

@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { TipoVaga } from '@/types'
 import { criarEvento } from '@/app/actions/eventos'
+import { makeSlug } from '@/lib/utils'
 
 interface NominatimResult {
   display_name: string
@@ -62,7 +63,7 @@ function gerarLinks(eventoId: string, vagas: VagasMap, equipes: EquipeItem[]) {
         links.push({
           equipe: e.key, tipo: t.key,
           label:  `${e.label} — ${t.label}`,
-          url:    `${base}/cadastro/${eventoId}?equipe=${e.key}&tipo=${t.key}`,
+          url:    `${base}/cadastro/${eventoId}?equipe=${encodeURIComponent(e.key)}&tipo=${encodeURIComponent(t.key)}`,
         })
       }
     })
@@ -105,10 +106,7 @@ export default function CadastrarEventosPage() {
   const adicionarEquipe = () => {
     const label = novaEquipe.trim()
     if (!label) { setErroEquipe('Informe o nome da equipe.'); return }
-    // slug: lowercase, strip accents, spaces → underscore
-    const key = label.toLowerCase()
-      .normalize('NFD').replace(/[̀-ͯ]/g, '')
-      .replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')
+    const key = makeSlug(label)
     if (!key) { setErroEquipe('Nome inválido.'); return }
     if (equipeItems.some(e => e.key === key)) { setErroEquipe('Equipe já existe.'); return }
 

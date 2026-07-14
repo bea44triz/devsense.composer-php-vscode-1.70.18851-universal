@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import { Input }  from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
-import { CheckCircle2, User, Phone, Mail, CreditCard, Wallet } from 'lucide-react'
+import { CheckCircle2, User, Phone, Mail, CreditCard, Wallet, Users } from 'lucide-react'
 import { Evento } from '@/types'
 import {
   isValidCpf, isValidEmail, isValidPhone, isValidPixKey,
@@ -12,7 +12,8 @@ import {
 
 const PIX_TIPOS = [
   { value: 'cpf',       label: 'CPF'      },
-  { value: 'telefone',  label: 'Telefone' },
+  { value: 'cnpj',      label: 'CNPJ'     },
+  { value: 'celular',   label: 'Celular'  },
   { value: 'email',     label: 'E-mail'   },
   { value: 'aleatoria', label: 'Aleatória'},
 ]
@@ -34,6 +35,13 @@ function getEquipeLabel(equipe: string, evento: Evento | null): string {
   return fromEvento ?? KNOWN_LABELS[equipe] ?? equipe
 }
 
+interface VagasInfo {
+  total: number
+  preenchidas: number
+  disponivel: number
+  inconsistente: boolean
+}
+
 export default function CadastroPage() {
   const params       = useParams()
   const search       = useSearchParams()
@@ -41,15 +49,18 @@ export default function CadastroPage() {
   const equipe       = search.get('equipe') ?? ''
   const tipo         = search.get('tipo') ?? ''
 
-  const [evento, setEvento] = useState<Evento | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [evento, setEvento]       = useState<Evento | null>(null)
+  const [loading, setLoading]     = useState(true)
+  const [vagasInfo, setVagasInfo] = useState<VagasInfo | null>(null)
+  const [vagasLoading, setVagasLoading] = useState(true)
+
   const [form, setForm] = useState({
     nome: '', cpf: '', telefone: '', email: '', pixTipo: 'cpf', pixChave: '',
   })
-  const [errors, setErrors] = useState<Partial<typeof form>>({})
+  const [errors, setErrors]     = useState<Partial<typeof form>>({})
   const [submitting, setSubmitting] = useState(false)
-  const [sucesso, setSucesso] = useState(false)
-  const [erro, setErro] = useState<string | null>(null)
+  const [sucesso, setSucesso]   = useState(false)
+  const [erro, setErro]         = useState<string | null>(null)
 
   useEffect(() => {
     fetch(`/api/eventos/${eventoId}`)
@@ -57,6 +68,14 @@ export default function CadastroPage() {
       .then(d => { if (d.success) setEvento(d.data) })
       .finally(() => setLoading(false))
   }, [eventoId])
+
+  useEffect(() => {
+    if (!eventoId || !equipe || !tipo) { setVagasLoading(false); return }
+    fetch(`/api/vagas?eventoId=${encodeURIComponent(eventoId)}&equipe=${encodeURIComponent(equipe)}&tipo=${encodeURIComponent(tipo)}`)
+      .then(r => r.json())
+      .then(d => { if (d.success) setVagasInfo(d.data) })
+      .finally(() => setVagasLoading(false))
+  }, [eventoId, equipe, tipo])
 
   const set = (f: keyof typeof form, v: string) => {
     setForm(p => ({ ...p, [f]: v }))
@@ -96,7 +115,8 @@ export default function CadastroPage() {
   function pixKeyErrorMsg(tipo: string): string {
     switch (tipo) {
       case 'cpf':       return 'Informe um CPF válido como chave PIX.'
-      case 'telefone':  return 'Informe um telefone válido como chave PIX.'
+      case 'cnpj':      return 'Informe um CNPJ válido como chave PIX.'
+      case 'celular':   return 'Informe um celular válido (DDD + 9 dígitos).'
       case 'email':     return 'Informe um e-mail válido como chave PIX.'
       case 'aleatoria': return 'Chave aleatória deve ter formato UUID (36 caracteres).'
       default:          return 'Chave PIX inválida.'
@@ -166,6 +186,7 @@ export default function CadastroPage() {
   }
 
   const dataEvento = new Intl.DateTimeFormat('pt-BR').format(new Date(evento.data + 'T12:00:00'))
+  const esgotado   = !vagasLoading && vagasInfo !== null && vagasInfo.disponivel === 0
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -180,69 +201,91 @@ export default function CadastroPage() {
       </header>
 
       <main className="px-4 py-5 max-w-lg mx-auto space-y-4">
-        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest px-1">Seus dados</p>
 
-        <form onSubmit={handleSubmit} className="space-y-3" noValidate>
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 space-y-3">
-            <Input label="Nome completo" placeholder="Nome e Sobrenome" value={form.nome}
-              onChange={e => set('nome', e.target.value)} error={errors.nome}
-              icon={<User className="w-4 h-4" />} />
-
-            <Input label="CPF" placeholder="000.000.000-00"
-              value={formatCpf(form.cpf)}
-              onChange={e => set('cpf', onlyDigits(e.target.value))}
-              error={errors.cpf}
-              icon={<CreditCard className="w-4 h-4" />}
-              inputMode="numeric"
-              maxLength={14} />
-
-            <Input label="Telefone / WhatsApp" placeholder="(11) 99999-0000"
-              value={formatPhone(form.telefone)}
-              onChange={e => set('telefone', onlyDigits(e.target.value))}
-              error={errors.telefone}
-              icon={<Phone className="w-4 h-4" />}
-              inputMode="tel"
-              maxLength={15} />
-
-            <Input label="E-mail" type="email" placeholder="seu@email.com" value={form.email}
-              onChange={e => set('email', e.target.value)} error={errors.email}
-              icon={<Mail className="w-4 h-4" />} />
-          </div>
-
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 space-y-3">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
-              <Wallet className="w-3.5 h-3.5" /> Dados PIX
-            </p>
-            <div className="flex gap-2 flex-wrap">
-              {PIX_TIPOS.map(p => (
-                <button key={p.value} type="button"
-                  onClick={() => setPixTipo(p.value)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border
-                    ${form.pixTipo === p.value
-                      ? 'bg-amber-500 text-white border-amber-500'
-                      : 'bg-white text-slate-600 border-slate-200'}`}>
-                  {p.label}
-                </button>
-              ))}
+        {esgotado ? (
+          <>
+            {vagasInfo?.inconsistente && (
+              <p className="text-xs text-orange-600 bg-orange-50 border border-orange-100 rounded-2xl px-4 py-3">
+                Atenção: número de inscrições excede as vagas configuradas.
+              </p>
+            )}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex flex-col items-center gap-3 text-center">
+              <div className="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center">
+                <Users className="w-7 h-7 text-red-500" />
+              </div>
+              <h3 className="font-black text-slate-800 text-lg">Vagas esgotadas</h3>
+              <p className="text-sm text-slate-500">
+                Todas as vagas para esta equipe já foram preenchidas.
+              </p>
             </div>
-            <Input label="Chave PIX" placeholder={pixPlaceholder(form.pixTipo)}
-              value={form.pixChave}
-              onChange={e => set('pixChave', e.target.value)}
-              error={errors.pixChave} />
-          </div>
+          </>
+        ) : (
+          <>
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest px-1">Seus dados</p>
 
-          {erro && (
-            <p className="text-sm text-red-500 bg-red-50 border border-red-100 rounded-2xl px-4 py-3">{erro}</p>
-          )}
+            <form onSubmit={handleSubmit} className="space-y-3" noValidate>
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 space-y-3">
+                <Input label="Nome completo" placeholder="Nome e Sobrenome" value={form.nome}
+                  onChange={e => set('nome', e.target.value)} error={errors.nome}
+                  icon={<User className="w-4 h-4" />} />
 
-          <Button type="submit" size="lg" loading={submitting}>
-            Confirmar cadastro
-          </Button>
+                <Input label="CPF" placeholder="000.000.000-00"
+                  value={formatCpf(form.cpf)}
+                  onChange={e => set('cpf', onlyDigits(e.target.value))}
+                  error={errors.cpf}
+                  icon={<CreditCard className="w-4 h-4" />}
+                  inputMode="numeric"
+                  maxLength={14} />
 
-          <p className="text-xs text-slate-400 text-center pb-4">
-            Ao se cadastrar você concorda em compartilhar seus dados com a Andrade Group.
-          </p>
-        </form>
+                <Input label="Telefone / WhatsApp" placeholder="(11) 99999-0000"
+                  value={formatPhone(form.telefone)}
+                  onChange={e => set('telefone', onlyDigits(e.target.value))}
+                  error={errors.telefone}
+                  icon={<Phone className="w-4 h-4" />}
+                  inputMode="tel"
+                  maxLength={15} />
+
+                <Input label="E-mail" type="email" placeholder="seu@email.com" value={form.email}
+                  onChange={e => set('email', e.target.value)} error={errors.email}
+                  icon={<Mail className="w-4 h-4" />} />
+              </div>
+
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 space-y-3">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
+                  <Wallet className="w-3.5 h-3.5" /> Dados PIX
+                </p>
+                <div className="flex gap-2 flex-wrap">
+                  {PIX_TIPOS.map(p => (
+                    <button key={p.value} type="button"
+                      onClick={() => setPixTipo(p.value)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border
+                        ${form.pixTipo === p.value
+                          ? 'bg-amber-500 text-white border-amber-500'
+                          : 'bg-white text-slate-600 border-slate-200'}`}>
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+                <Input label="Chave PIX" placeholder={pixPlaceholder(form.pixTipo)}
+                  value={form.pixChave}
+                  onChange={e => set('pixChave', e.target.value)}
+                  error={errors.pixChave} />
+              </div>
+
+              {erro && (
+                <p className="text-sm text-red-500 bg-red-50 border border-red-100 rounded-2xl px-4 py-3">{erro}</p>
+              )}
+
+              <Button type="submit" size="lg" loading={submitting}>
+                Confirmar cadastro
+              </Button>
+
+              <p className="text-xs text-slate-400 text-center pb-4">
+                Ao se cadastrar você concorda em compartilhar seus dados com a Andrade Group.
+              </p>
+            </form>
+          </>
+        )}
       </main>
     </div>
   )
@@ -251,7 +294,8 @@ export default function CadastroPage() {
 function pixPlaceholder(tipo: string): string {
   switch (tipo) {
     case 'cpf':       return '000.000.000-00'
-    case 'telefone':  return '(11) 99999-0000'
+    case 'cnpj':      return '00.000.000/0001-00'
+    case 'celular':   return '(11) 99999-0000'
     case 'email':     return 'seu@email.com'
     case 'aleatoria': return 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
     default:          return 'Sua chave PIX'

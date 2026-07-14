@@ -100,9 +100,10 @@ export default async function EventoDetailPage({ params }: { params: Promise<{ i
           <CardSection title="Equipes">
             <div className="space-y-2">
               {evento.equipes.filter(e => e.vagas > 0).map(e => {
-                const preenchido = inscricoes.filter(r => r[8] === e.equipe && r[9] === e.tipo).length
-                const disponivel = Math.max(0, e.vagas - preenchido)
-                const cheio      = disponivel === 0
+                const preenchido  = inscricoes.filter(r => r[8] === e.equipe && r[9] === e.tipo).length
+                const disponivel  = Math.max(0, e.vagas - preenchido)
+                const cheio       = disponivel === 0
+                const inconsistente = preenchido > e.vagas
 
                 return (
                   <div key={`${e.equipe}_${e.tipo}`}
@@ -122,6 +123,11 @@ export default async function EventoDetailPage({ params }: { params: Promise<{ i
                         <p className="text-[10px] text-slate-400 mt-0.5">
                           {preenchido} preenchida{preenchido !== 1 ? 's' : ''} · {disponivel} disponível{disponivel !== 1 ? 'is' : ''}
                         </p>
+                        {inconsistente && (
+                          <p className="text-[10px] text-orange-500 font-semibold mt-0.5">
+                            ⚠ Inscrições excedem as vagas
+                          </p>
+                        )}
                       </div>
                     </div>
                     <div className="flex flex-col items-end gap-1.5 shrink-0">

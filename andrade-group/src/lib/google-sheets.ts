@@ -23,6 +23,7 @@ export async function sheetAppend(range: string, row: string[]) {
 }
 
 // Writes a row at an explicit row number (bypasses append table-detection).
+// RAW mode stores strings exactly as sent, preserving leading zeros in CPF, phone, etc.
 async function sheetWriteRow(sheetName: string, lastCol: string, row: string[]) {
   const existing = await sheetGet(`${sheetName}!A:A`)
   const nextRow  = existing.length + 1
@@ -30,7 +31,7 @@ async function sheetWriteRow(sheetName: string, lastCol: string, row: string[]) 
   await sheets.spreadsheets.values.update({
     spreadsheetId: SPREADSHEET_ID,
     range: `${sheetName}!A${nextRow}:${lastCol}${nextRow}`,
-    valueInputOption: 'USER_ENTERED',
+    valueInputOption: 'RAW',
     requestBody: { values: [row] },
   })
   return nextRow
@@ -109,13 +110,8 @@ export async function getInscricaoByCpfEvento(cpf: string, eventoId: string) {
 
 export async function appendInscricao(row: string[]) {
   // row: [id, eventoId, nome, cpf, telefone, email, pixTipo, pixChave, equipe, tipo, criadoEm]
-  // Prefix CPF (3), telefone (4) and pixChave (7) with ' so Sheets stores them as text,
-  // preserving any leading zeros. USER_ENTERED strips the prefix; reads return the plain text.
-  const r = [...row]
-  if (r[3]) r[3] = `'${r[3]}`
-  if (r[4]) r[4] = `'${r[4]}`
-  if (r[7]) r[7] = `'${r[7]}`
-  return sheetWriteRow('Inscricoes', 'K', r)
+  // RAW mode in sheetWriteRow preserves leading zeros without any prefix.
+  return sheetWriteRow('Inscricoes', 'K', row)
 }
 
 // ── Check-in / Check-out ───────────────────────────────────────────────────────
@@ -124,10 +120,8 @@ export async function appendInscricao(row: string[]) {
 
 export async function appendCheckInOut(row: string[]) {
   // row: [id, eventoId, cpf, nome, equipe, tipo, tipoRegistro, localRegistro, lat, lon, accuracy, timestamp]
-  // Prefix cpf (2) with ' to force text storage and preserve leading zeros.
-  const r = [...row]
-  if (r[2]) r[2] = `'${r[2]}`
-  return sheetWriteRow('CheckInOut', 'L', r)
+  // RAW mode in sheetWriteRow preserves leading zeros without any prefix.
+  return sheetWriteRow('CheckInOut', 'L', row)
 }
 
 export async function getCheckInOutByEvento(eventoId: string) {

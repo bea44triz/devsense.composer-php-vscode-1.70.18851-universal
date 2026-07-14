@@ -7,9 +7,9 @@ import { Input }   from '@/components/ui/Input'
 import { Button }  from '@/components/ui/Button'
 import {
   CheckCircle2, Copy, CalendarDays, Clock,
-  MapPin, DollarSign, AlignLeft, Users,
+  MapPin, DollarSign, AlignLeft, Users, Plus, Trash2,
 } from 'lucide-react'
-import { EquipeNome, TipoVaga } from '@/types'
+import { TipoVaga } from '@/types'
 import { criarEvento } from '@/app/actions/eventos'
 
 interface NominatimResult {
@@ -18,11 +18,20 @@ interface NominatimResult {
   lon: string
 }
 
-const EQUIPES: { key: EquipeNome; label: string }[] = [
-  { key: 'brigadistas', label: 'Brigadistas' },
-  { key: 'segurancas',  label: 'Seguranças'  },
-  { key: 'limpeza',     label: 'Limpeza'     },
+// ── Static types / constants ────────────────────────────────────────────────
+
+interface EquipeItem {
+  key:       string
+  label:     string
+  removable: boolean
+}
+
+const DEFAULT_EQUIPES: EquipeItem[] = [
+  { key: 'brigadistas', label: 'Brigadistas', removable: false },
+  { key: 'segurancas',  label: 'Seguranças',  removable: false },
+  { key: 'limpeza',     label: 'Limpeza',     removable: false },
 ]
+
 const TIPOS: { key: TipoVaga; label: string }[] = [
   { key: 'coordenador', label: 'Coordenador' },
   { key: 'freelancer',  label: 'Freelancer'  },
@@ -39,21 +48,21 @@ const emptyBase: BaseForm = {
   titulo: '', descricao: '', data: '', horaInicio: '',
   horaFim: '', local: '', endereco: '',
 }
-const emptyVagas = (): VagasMap =>
-  Object.fromEntries(EQUIPES.flatMap(e => TIPOS.map(t => [`${e.key}_${t.key}`, '0'])))
-const emptyValores = (): ValoresMap => ({})
+const emptyVagasFor = (items: EquipeItem[]): VagasMap =>
+  Object.fromEntries(items.flatMap(e => TIPOS.map(t => [`${e.key}_${t.key}`, '0'])))
 
-function gerarLinks(eventoId: string, vagas: VagasMap) {
+// ── Link generator ───────────────────────────────────────────────────────────
+
+function gerarLinks(eventoId: string, vagas: VagasMap, equipes: EquipeItem[]) {
   const base = typeof window !== 'undefined' ? window.location.origin : ''
   const links: { equipe: string; tipo: string; label: string; url: string }[] = []
-  EQUIPES.forEach(e => {
+  equipes.forEach(e => {
     TIPOS.forEach(t => {
-      const qty = Number(vagas[`${e.key}_${t.key}`] ?? 0)
-      if (qty > 0) {
+      if (Number(vagas[`${e.key}_${t.key}`] ?? 0) > 0) {
         links.push({
           equipe: e.key, tipo: t.key,
-          label: `${e.label} — ${t.label}`,
-          url: `${base}/cadastro/${eventoId}?equipe=${e.key}&tipo=${t.key}`,
+          label:  `${e.label} — ${t.label}`,
+          url:    `${base}/cadastro/${eventoId}?equipe=${e.key}&tipo=${t.key}`,
         })
       }
     })
@@ -61,38 +70,81 @@ function gerarLinks(eventoId: string, vagas: VagasMap) {
   return links
 }
 
+// ────────────────────────────────────────────────────────────────────────────
+
 export default function CadastrarEventosPage() {
-  const [form, setForm]         = useState<BaseForm>(emptyBase)
-  const [vagas, setVagas]       = useState<VagasMap>(emptyVagas())
-  const [valores, setValores]   = useState<ValoresMap>(emptyValores())
-  const [lat, setLat]           = useState<number | null>(null)
-  const [lng, setLng]           = useState<number | null>(null)
-  const [sugestoes, setSugestoes] = useState<NominatimResult[]>([])
-  const [showSug, setShowSug]   = useState(false)
-  const debounceRef             = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [errors, setErrors]     = useState<Record<string, string>>({})
-  const [loading, setLoading]   = useState(false)
-  const [eventoId, setEventoId] = useState<string | null>(null)
-  const [copied, setCopied]     = useState<string | null>(null)
+  const [form, setForm]               = useState<BaseForm>(emptyBase)
+  const [equipeItems, setEquipeItems] = useState<EquipeItem[]>(DEFAULT_EQUIPES)
+  const [vagas, setVagas]             = useState<VagasMap>(emptyVagasFor(DEFAULT_EQUIPES))
+  const [valores, setValores]         = useState<ValoresMap>({})
+  const [novaEquipe, setNovaEquipe]   = useState('')
+  const [erroEquipe, setErroEquipe]   = useState<string | null>(null)
+  const [lat, setLat]                 = useState<number | null>(null)
+  const [lng, setLng]                 = useState<number | null>(null)
+  const [sugestoes, setSugestoes]     = useState<NominatimResult[]>([])
+  const [showSug, setShowSug]         = useState(false)
+  const debounceRef                   = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [errors, setErrors]           = useState<Record<string, string>>({})
+  const [loading, setLoading]         = useState(false)
+  const [eventoId, setEventoId]       = useState<string | null>(null)
+  const [copied, setCopied]           = useState<string | null>(null)
 
   const set = (f: keyof BaseForm, v: string) => {
     setForm(p => ({ ...p, [f]: v }))
     setErrors(p => { const n = { ...p }; delete n[f]; return n })
   }
 
-  const setVaga = (equipe: EquipeNome, tipo: TipoVaga, v: string) =>
-    setVagas(p => ({ ...p, [`${equipe}_${tipo}`]: v }))
+  const setVaga = (equipeKey: string, tipo: TipoVaga, v: string) =>
+    setVagas(p => ({ ...p, [`${equipeKey}_${tipo}`]: v }))
 
   const setValor = (key: string, v: string) =>
     setValores(p => ({ ...p, [key]: v }))
 
-  /* Combos ativas (vagas > 0) */
-  const activeCombos = EQUIPES.flatMap(e =>
+  // ── Dynamic equipes ─────────────────────────────────────────────────────────
+
+  const adicionarEquipe = () => {
+    const label = novaEquipe.trim()
+    if (!label) { setErroEquipe('Informe o nome da equipe.'); return }
+    // slug: lowercase, strip accents, spaces → underscore
+    const key = label.toLowerCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')
+    if (!key) { setErroEquipe('Nome inválido.'); return }
+    if (equipeItems.some(e => e.key === key)) { setErroEquipe('Equipe já existe.'); return }
+
+    const newItem: EquipeItem = { key, label, removable: true }
+    setEquipeItems(prev => [...prev, newItem])
+    setVagas(prev => ({
+      ...prev,
+      ...Object.fromEntries(TIPOS.map(t => [`${key}_${t.key}`, '0'])),
+    }))
+    setNovaEquipe('')
+    setErroEquipe(null)
+  }
+
+  const removerEquipe = (key: string) => {
+    setEquipeItems(prev => prev.filter(e => e.key !== key))
+    setVagas(prev => {
+      const n = { ...prev }
+      TIPOS.forEach(t => delete n[`${key}_${t.key}`])
+      return n
+    })
+    setValores(prev => {
+      const n = { ...prev }
+      TIPOS.forEach(t => delete n[`${key}_${t.key}`])
+      return n
+    })
+  }
+
+  // ── Active combos (vagas > 0) ────────────────────────────────────────────────
+
+  const activeCombos = equipeItems.flatMap(e =>
     TIPOS.filter(t => Number(vagas[`${e.key}_${t.key}`]) > 0)
       .map(t => ({ equipe: e, tipo: t, key: `${e.key}_${t.key}` }))
   )
 
-  /* Autocomplete de endereço via Nominatim */
+  // ── Address autocomplete ─────────────────────────────────────────────────────
+
   const onEnderecoChange = (v: string) => {
     set('endereco', v)
     setLat(null); setLng(null)
@@ -118,6 +170,8 @@ export default function CadastrarEventosPage() {
     setErrors(p => { const n = { ...p }; delete n.endereco; return n })
   }
 
+  // ── Validation ───────────────────────────────────────────────────────────────
+
   const validate = () => {
     const e: Record<string, string> = {}
     if (!form.titulo.trim())    e.titulo     = 'Obrigatório'
@@ -136,20 +190,24 @@ export default function CadastrarEventosPage() {
     return Object.keys(e).length === 0
   }
 
+  // ── Submit ───────────────────────────────────────────────────────────────────
+
   const handleSubmit = async (ev: React.FormEvent) => {
     ev.preventDefault()
     if (!validate()) return
     setLoading(true)
     try {
-      const equipes = EQUIPES.flatMap(e =>
+      const equipesPayload = equipeItems.flatMap(e =>
         TIPOS.map(t => ({
-          equipe: e.key, tipo: t.key,
-          vagas: Number(vagas[`${e.key}_${t.key}`]),
+          equipe:       e.key,
+          label:        e.label,
+          tipo:         t.key,
+          vagas:        Number(vagas[`${e.key}_${t.key}`]),
           vagasOcupadas: 0,
-          valorDiaria: Number(valores[`${e.key}_${t.key}`] ?? 0),
+          valorDiaria:  Number(valores[`${e.key}_${t.key}`] ?? 0),
         })).filter(x => x.vagas > 0)
       )
-      const result = await criarEvento({ ...form, latitude: lat, longitude: lng, equipes })
+      const result = await criarEvento({ ...form, latitude: lat, longitude: lng, equipes: equipesPayload })
       if (!result.success) throw new Error(result.error)
       setEventoId(result.data.id)
     } catch (err) {
@@ -164,9 +222,10 @@ export default function CadastrarEventosPage() {
     setCopied(key); setTimeout(() => setCopied(null), 2000)
   }
 
-  /* ── Sucesso ── */
+  // ── Success screen ───────────────────────────────────────────────────────────
+
   if (eventoId) {
-    const regLinks    = gerarLinks(eventoId, vagas)
+    const regLinks    = gerarLinks(eventoId, vagas, equipeItems)
     const origin      = typeof window !== 'undefined' ? window.location.origin : ''
     const checkinUrl  = `${origin}/checkin/${eventoId}`
     const checkoutUrl = `${origin}/checkout/${eventoId}`
@@ -229,7 +288,12 @@ export default function CadastrarEventosPage() {
 
           <div className="flex gap-3">
             <Button variant="outline" className="flex-1" onClick={() => {
-              setEventoId(null); setForm(emptyBase); setVagas(emptyVagas()); setValores(emptyValores())
+              setEventoId(null)
+              setForm(emptyBase)
+              setEquipeItems(DEFAULT_EQUIPES)
+              setVagas(emptyVagasFor(DEFAULT_EQUIPES))
+              setValores({})
+              setNovaEquipe('')
             }}>
               Novo evento
             </Button>
@@ -243,7 +307,8 @@ export default function CadastrarEventosPage() {
     )
   }
 
-  /* ── Formulário ── */
+  // ── Form ─────────────────────────────────────────────────────────────────────
+
   return (
     <AppShell>
       <PageHeader title="Criar Evento" subtitle="Área administrativa" backHref="/" />
@@ -335,6 +400,7 @@ export default function CadastrarEventosPage() {
                 Informe quantas vagas por equipe e tipo. Deixe 0 para não gerar link.
               </p>
               {errors.vagas && <p className="text-xs text-red-500 mb-2">⚠ {errors.vagas}</p>}
+
               <div className="overflow-x-auto -mx-1">
                 <table className="w-full text-sm min-w-[260px]">
                   <thead>
@@ -343,14 +409,15 @@ export default function CadastrarEventosPage() {
                       {TIPOS.map(t => (
                         <th key={t.key} className="pb-2 text-xs text-slate-400 font-semibold text-center w-28">{t.label}</th>
                       ))}
+                      <th className="w-8" />
                     </tr>
                   </thead>
                   <tbody>
-                    {EQUIPES.map(e => (
+                    {equipeItems.map(e => (
                       <tr key={e.key}>
                         <td className="py-1.5 pl-1">
                           <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
-                            <Users className="w-3.5 h-3.5 text-amber-500" />
+                            <Users className="w-3.5 h-3.5 text-amber-500 shrink-0" />
                             {e.label}
                           </span>
                         </td>
@@ -358,21 +425,56 @@ export default function CadastrarEventosPage() {
                           <td key={t.key} className="py-1.5 px-1">
                             <input
                               type="number" min="0" inputMode="numeric"
-                              value={vagas[`${e.key}_${t.key}`]}
+                              value={vagas[`${e.key}_${t.key}`] ?? '0'}
                               onChange={ev => setVaga(e.key, t.key, ev.target.value)}
                               className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-center font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-400 shadow-sm"
                             />
                           </td>
                         ))}
+                        <td className="py-1.5 pl-1">
+                          {e.removable && (
+                            <button
+                              type="button"
+                              onClick={() => removerEquipe(e.key)}
+                              className="p-1 text-slate-400 hover:text-red-500 transition-colors"
+                              aria-label={`Remover ${e.label}`}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
+
+              {/* Add new team */}
+              <div className="mt-3 flex gap-2 items-start">
+                <div className="flex-1">
+                  <input
+                    type="text"
+                    placeholder="Nome da nova equipe"
+                    value={novaEquipe}
+                    onChange={e => { setNovaEquipe(e.target.value); setErroEquipe(null) }}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); adicionarEquipe() } }}
+                    className={`w-full rounded-xl border px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-400 shadow-sm ${erroEquipe ? 'border-red-300 bg-red-50/30' : 'border-slate-200'}`}
+                  />
+                  {erroEquipe && <p className="text-xs text-red-500 mt-1">⚠ {erroEquipe}</p>}
+                </div>
+                <button
+                  type="button"
+                  onClick={adicionarEquipe}
+                  className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-xs font-semibold hover:bg-amber-100 transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Adicionar equipe
+                </button>
+              </div>
             </CardSection>
           </Card>
 
-          {/* Pagamento — campos dinâmicos por combo ativa */}
+          {/* Payment — dynamic per active combo */}
           {activeCombos.length > 0 && (
             <Card>
               <CardSection title="Pagamento">

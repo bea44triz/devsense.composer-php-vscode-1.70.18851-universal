@@ -1,8 +1,9 @@
-export type EquipeNome = 'brigadistas' | 'segurancas' | 'limpeza'
+export type EquipeNome = string
 export type TipoVaga  = 'coordenador' | 'freelancer'
 
 export interface EquipeVaga {
-  equipe:         EquipeNome
+  equipe:         string
+  label?:         string   // display name; falls back to equipe when absent
   tipo:           TipoVaga
   vagas:          number
   vagasOcupadas:  number

@@ -5,6 +5,10 @@ import { Input }  from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { CheckCircle2, User, Phone, Mail, CreditCard, Wallet } from 'lucide-react'
 import { Evento } from '@/types'
+import {
+  isValidCpf, isValidEmail, isValidPhone, isValidPixKey,
+  hasFullName, onlyDigits, formatCpf, formatPhone,
+} from '@/lib/utils'
 
 const PIX_TIPOS = [
   { value: 'cpf',       label: 'CPF'      },
@@ -13,7 +17,9 @@ const PIX_TIPOS = [
   { value: 'aleatoria', label: 'Aleatória'},
 ]
 
-const EQUIPE_LABELS: Record<string, string> = {
+// Fallback labels for the three original teams (for backwards-compatible events
+// stored before the label field was added)
+const KNOWN_LABELS: Record<string, string> = {
   brigadistas: 'Brigadistas',
   segurancas:  'Seguranças',
   limpeza:     'Limpeza',
@@ -21,6 +27,11 @@ const EQUIPE_LABELS: Record<string, string> = {
 const TIPO_LABELS: Record<string, string> = {
   coordenador: 'Coordenador',
   freelancer:  'Freelancer',
+}
+
+function getEquipeLabel(equipe: string, evento: Evento | null): string {
+  const fromEvento = evento?.equipes.find(e => e.equipe === equipe)?.label
+  return fromEvento ?? KNOWN_LABELS[equipe] ?? equipe
 }
 
 export default function CadastroPage() {
@@ -52,15 +63,44 @@ export default function CadastroPage() {
     setErrors(p => ({ ...p, [f]: undefined }))
   }
 
+  // Clear pixChave whenever the type changes
+  const setPixTipo = (v: string) => {
+    setForm(p => ({ ...p, pixTipo: v, pixChave: '' }))
+    setErrors(p => ({ ...p, pixTipo: undefined, pixChave: undefined }))
+  }
+
+  // ── Validation ────────────────────────────────────────────────────────────────
+
   const validate = () => {
     const e: Partial<typeof form> = {}
-    if (!form.nome.trim())      e.nome      = 'Obrigatório'
-    if (!form.cpf.trim())       e.cpf       = 'Obrigatório'
-    if (!form.telefone.trim())  e.telefone  = 'Obrigatório'
-    if (!form.email.trim())     e.email     = 'Obrigatório'
-    if (!form.pixChave.trim())  e.pixChave  = 'Obrigatório'
+
+    if (!hasFullName(form.nome))
+      e.nome = 'Informe nome e sobrenome.'
+
+    if (!isValidCpf(form.cpf))
+      e.cpf = 'CPF inválido. Verifique os 11 dígitos.'
+
+    if (!isValidPhone(form.telefone))
+      e.telefone = 'Informe DDD + número (10 ou 11 dígitos).'
+
+    if (!isValidEmail(form.email))
+      e.email = 'E-mail inválido.'
+
+    if (!isValidPixKey(form.pixChave, form.pixTipo))
+      e.pixChave = pixKeyErrorMsg(form.pixTipo)
+
     setErrors(e)
     return Object.keys(e).length === 0
+  }
+
+  function pixKeyErrorMsg(tipo: string): string {
+    switch (tipo) {
+      case 'cpf':       return 'Informe um CPF válido como chave PIX.'
+      case 'telefone':  return 'Informe um telefone válido como chave PIX.'
+      case 'email':     return 'Informe um e-mail válido como chave PIX.'
+      case 'aleatoria': return 'Chave aleatória deve ter formato UUID (36 caracteres).'
+      default:          return 'Chave PIX inválida.'
+    }
   }
 
   const handleSubmit = async (ev: React.FormEvent) => {
@@ -71,7 +111,15 @@ export default function CadastroPage() {
       const res = await fetch('/api/inscricoes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, eventoId, equipe, tipo }),
+        body: JSON.stringify({
+          eventoId, equipe, tipo,
+          nome:     form.nome.trim(),
+          cpf:      onlyDigits(form.cpf),
+          telefone: onlyDigits(form.telefone),
+          email:    form.email.trim(),
+          pixTipo:  form.pixTipo,
+          pixChave: form.pixChave.trim(),
+        }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Erro ao cadastrar.')
@@ -107,8 +155,8 @@ export default function CadastroPage() {
         </div>
         <h2 className="text-2xl font-black text-slate-800">Cadastro realizado!</h2>
         <p className="text-slate-500 text-sm max-w-xs">
-          Você está inscrito como <strong>{TIPO_LABELS[tipo]}</strong> na equipe de{' '}
-          <strong>{EQUIPE_LABELS[equipe]}</strong>.
+          Você está inscrito como <strong>{TIPO_LABELS[tipo] ?? tipo}</strong> na equipe de{' '}
+          <strong>{getEquipeLabel(equipe, evento)}</strong>.
         </p>
         <p className="text-xs text-slate-400">
           O coordenador enviará o link de check-in no dia do evento.
@@ -121,10 +169,9 @@ export default function CadastroPage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Header */}
       <header className="bg-slate-900 text-white px-5 pt-12 pb-6">
         <div className="inline-flex items-center gap-1 bg-amber-500/20 text-amber-300 text-xs font-semibold px-2.5 py-1 rounded-full mb-3">
-          {EQUIPE_LABELS[equipe]} · {TIPO_LABELS[tipo]}
+          {getEquipeLabel(equipe, evento)} · {TIPO_LABELS[tipo] ?? tipo}
         </div>
         <h1 className="text-xl font-black">{evento.titulo}</h1>
         <p className="text-slate-400 text-sm mt-1">
@@ -137,15 +184,26 @@ export default function CadastroPage() {
 
         <form onSubmit={handleSubmit} className="space-y-3" noValidate>
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 space-y-3">
-            <Input label="Nome completo" placeholder="Seu nome" value={form.nome}
+            <Input label="Nome completo" placeholder="Nome e Sobrenome" value={form.nome}
               onChange={e => set('nome', e.target.value)} error={errors.nome}
               icon={<User className="w-4 h-4" />} />
-            <Input label="CPF" placeholder="000.000.000-00" value={form.cpf}
-              onChange={e => set('cpf', e.target.value)} error={errors.cpf}
-              icon={<CreditCard className="w-4 h-4" />} inputMode="numeric" />
-            <Input label="Telefone / WhatsApp" placeholder="(11) 99999-0000" value={form.telefone}
-              onChange={e => set('telefone', e.target.value)} error={errors.telefone}
-              icon={<Phone className="w-4 h-4" />} inputMode="tel" />
+
+            <Input label="CPF" placeholder="000.000.000-00"
+              value={formatCpf(form.cpf)}
+              onChange={e => set('cpf', onlyDigits(e.target.value))}
+              error={errors.cpf}
+              icon={<CreditCard className="w-4 h-4" />}
+              inputMode="numeric"
+              maxLength={14} />
+
+            <Input label="Telefone / WhatsApp" placeholder="(11) 99999-0000"
+              value={formatPhone(form.telefone)}
+              onChange={e => set('telefone', onlyDigits(e.target.value))}
+              error={errors.telefone}
+              icon={<Phone className="w-4 h-4" />}
+              inputMode="tel"
+              maxLength={15} />
+
             <Input label="E-mail" type="email" placeholder="seu@email.com" value={form.email}
               onChange={e => set('email', e.target.value)} error={errors.email}
               icon={<Mail className="w-4 h-4" />} />
@@ -158,7 +216,7 @@ export default function CadastroPage() {
             <div className="flex gap-2 flex-wrap">
               {PIX_TIPOS.map(p => (
                 <button key={p.value} type="button"
-                  onClick={() => set('pixTipo', p.value)}
+                  onClick={() => setPixTipo(p.value)}
                   className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border
                     ${form.pixTipo === p.value
                       ? 'bg-amber-500 text-white border-amber-500'
@@ -167,8 +225,10 @@ export default function CadastroPage() {
                 </button>
               ))}
             </div>
-            <Input label="Chave PIX" placeholder="Digite sua chave" value={form.pixChave}
-              onChange={e => set('pixChave', e.target.value)} error={errors.pixChave} />
+            <Input label="Chave PIX" placeholder={pixPlaceholder(form.pixTipo)}
+              value={form.pixChave}
+              onChange={e => set('pixChave', e.target.value)}
+              error={errors.pixChave} />
           </div>
 
           {erro && (
@@ -186,4 +246,14 @@ export default function CadastroPage() {
       </main>
     </div>
   )
+}
+
+function pixPlaceholder(tipo: string): string {
+  switch (tipo) {
+    case 'cpf':       return '000.000.000-00'
+    case 'telefone':  return '(11) 99999-0000'
+    case 'email':     return 'seu@email.com'
+    case 'aleatoria': return 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
+    default:          return 'Sua chave PIX'
+  }
 }

@@ -102,11 +102,20 @@ export async function getInscricoesByEvento(eventoId: string) {
 
 export async function getInscricaoByCpfEvento(cpf: string, eventoId: string) {
   const rows = await sheetGet('Inscricoes!A:K')
-  return rows.find(r => r[3] === cpf && r[1] === eventoId) ?? null
+  // Normalise both sides to digits-only to handle formatting differences
+  const cpfDigits = cpf.replace(/\D/g, '')
+  return rows.find(r => (r[3]?.replace(/\D/g, '') ?? '') === cpfDigits && r[1] === eventoId) ?? null
 }
 
 export async function appendInscricao(row: string[]) {
-  return sheetWriteRow('Inscricoes', 'K', row)
+  // row: [id, eventoId, nome, cpf, telefone, email, pixTipo, pixChave, equipe, tipo, criadoEm]
+  // Prefix CPF (3), telefone (4) and pixChave (7) with ' so Sheets stores them as text,
+  // preserving any leading zeros. USER_ENTERED strips the prefix; reads return the plain text.
+  const r = [...row]
+  if (r[3]) r[3] = `'${r[3]}`
+  if (r[4]) r[4] = `'${r[4]}`
+  if (r[7]) r[7] = `'${r[7]}`
+  return sheetWriteRow('Inscricoes', 'K', r)
 }
 
 // ── Check-in / Check-out ───────────────────────────────────────────────────────
@@ -114,7 +123,11 @@ export async function appendInscricao(row: string[]) {
 //                  G:tipoRegistro | H:latitude | I:longitude | J:accuracy | K:timestamp
 
 export async function appendCheckInOut(row: string[]) {
-  return sheetWriteRow('CheckInOut', 'L', row)
+  // row: [id, eventoId, cpf, nome, equipe, tipo, tipoRegistro, localRegistro, lat, lon, accuracy, timestamp]
+  // Prefix cpf (2) with ' to force text storage and preserve leading zeros.
+  const r = [...row]
+  if (r[2]) r[2] = `'${r[2]}`
+  return sheetWriteRow('CheckInOut', 'L', r)
 }
 
 export async function getCheckInOutByEvento(eventoId: string) {

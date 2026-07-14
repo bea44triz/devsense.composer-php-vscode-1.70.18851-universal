@@ -1,14 +1,14 @@
-import { auth }        from '@/auth'
-import { redirect }    from 'next/navigation'
-import { getEventoById } from '@/lib/google-sheets'
-import { rowToEvento } from '@/app/api/eventos/route'
-import { AppShell }    from '@/components/Layout/AppShell'
-import { PageHeader }  from '@/components/Layout/PageHeader'
-import { Card, CardSection } from '@/components/ui/Card'
-import { LinkCopy }    from '@/components/ui/LinkCopy'
+import { auth }                  from '@/auth'
+import { redirect }              from 'next/navigation'
+import { getEventoById, getInscricoesByEvento } from '@/lib/google-sheets'
+import { rowToEvento }           from '@/app/api/eventos/route'
+import { AppShell }              from '@/components/Layout/AppShell'
+import { PageHeader }            from '@/components/Layout/PageHeader'
+import { Card, CardSection }     from '@/components/ui/Card'
+import { LinkCopy }              from '@/components/ui/LinkCopy'
 import { CalendarDays, MapPin, DollarSign, Users } from 'lucide-react'
 
-const EQUIPE_LABELS: Record<string, string> = {
+const KNOWN_LABELS: Record<string, string> = {
   brigadistas: 'Brigadistas',
   segurancas:  'Seguranças',
   limpeza:     'Limpeza',
@@ -16,6 +16,10 @@ const EQUIPE_LABELS: Record<string, string> = {
 const TIPO_LABELS: Record<string, string> = {
   coordenador: 'Coordenador',
   freelancer:  'Freelancer',
+}
+
+function equipeLabel(equipe: string, label?: string): string {
+  return label ?? KNOWN_LABELS[equipe] ?? equipe
 }
 
 export default async function EventoDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -27,11 +31,14 @@ export default async function EventoDetailPage({ params }: { params: Promise<{ i
   if (!row) redirect('/gerenciador/eventos')
   const evento  = rowToEvento(row)
 
+  // Fetch real inscription counts
+  const inscricoes = await getInscricoesByEvento(id)
+
   const baseUrl = process.env.NEXTAUTH_URL ?? ''
   const dataFmt = new Intl.DateTimeFormat('pt-BR').format(new Date(evento.data + 'T12:00:00'))
 
   const regLinks = evento.equipes.filter(e => e.vagas > 0).map(e => ({
-    label: `${EQUIPE_LABELS[e.equipe] ?? e.equipe} — ${TIPO_LABELS[e.tipo] ?? e.tipo} (${e.vagas} vagas)`,
+    label: `${equipeLabel(e.equipe, e.label)} — ${TIPO_LABELS[e.tipo] ?? e.tipo} (${e.vagas} vagas)`,
     url:   `${baseUrl}/cadastro/${id}?equipe=${e.equipe}&tipo=${e.tipo}`,
   }))
 
@@ -92,29 +99,61 @@ export default async function EventoDetailPage({ params }: { params: Promise<{ i
         <Card>
           <CardSection title="Equipes">
             <div className="space-y-2">
-              {evento.equipes.filter(e => e.vagas > 0).map(e => (
-                <div key={`${e.equipe}_${e.tipo}`}
-                  className="flex items-center justify-between text-sm bg-slate-50 rounded-xl px-3 py-2.5">
-                  <div className="flex items-center gap-2">
-                    <Users className="w-3.5 h-3.5 text-amber-500" />
-                    <div>
-                      <span className="text-slate-700 font-semibold text-xs">
-                        {EQUIPE_LABELS[e.equipe] ?? e.equipe} · {TIPO_LABELS[e.tipo] ?? e.tipo}
-                      </span>
-                      {e.valorDiaria != null && e.valorDiaria > 0 && (
-                        <p className="text-[10px] text-slate-400 flex items-center gap-0.5 mt-0.5">
-                          <DollarSign className="w-2.5 h-2.5" />
-                          Diária: R$ {e.valorDiaria.toFixed(2).replace('.', ',')}
+              {evento.equipes.filter(e => e.vagas > 0).map(e => {
+                const preenchido = inscricoes.filter(r => r[8] === e.equipe && r[9] === e.tipo).length
+                const disponivel = Math.max(0, e.vagas - preenchido)
+                const cheio      = disponivel === 0
+
+                return (
+                  <div key={`${e.equipe}_${e.tipo}`}
+                    className="flex items-center justify-between text-sm bg-slate-50 rounded-xl px-3 py-2.5">
+                    <div className="flex items-start gap-2">
+                      <Users className="w-3.5 h-3.5 text-amber-500 mt-0.5 shrink-0" />
+                      <div>
+                        <span className="text-slate-700 font-semibold text-xs">
+                          {equipeLabel(e.equipe, e.label)} · {TIPO_LABELS[e.tipo] ?? e.tipo}
+                        </span>
+                        {e.valorDiaria != null && e.valorDiaria > 0 && (
+                          <p className="text-[10px] text-slate-400 flex items-center gap-0.5 mt-0.5">
+                            <DollarSign className="w-2.5 h-2.5" />
+                            Diária: R$ {e.valorDiaria.toFixed(2).replace('.', ',')}
+                          </p>
+                        )}
+                        <p className="text-[10px] text-slate-400 mt-0.5">
+                          {preenchido} preenchida{preenchido !== 1 ? 's' : ''} · {disponivel} disponível{disponivel !== 1 ? 'is' : ''}
                         </p>
-                      )}
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-1.5 shrink-0">
+                      <span className="text-xs font-mono bg-white border border-slate-200 px-2 py-0.5 rounded-full text-slate-600">
+                        {preenchido}/{e.vagas}
+                      </span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        cheio
+                          ? 'bg-red-100 text-red-600'
+                          : 'bg-emerald-100 text-emerald-700'
+                      }`}>
+                        {cheio ? 'Indisponível' : 'Disponível'}
+                      </span>
                     </div>
                   </div>
-                  <span className="text-xs font-mono bg-white border border-slate-200 px-2 py-0.5 rounded-full text-slate-600">
-                    {e.vagasOcupadas}/{e.vagas}
-                  </span>
-                </div>
-              ))}
+                )
+              })}
             </div>
+
+            {/* Summary totals */}
+            {evento.equipes.some(e => e.vagas > 0) && (() => {
+              const total      = evento.equipes.reduce((s, e) => s + e.vagas, 0)
+              const preenchido = inscricoes.filter(r => evento.equipes.some(e => e.equipe === r[8] && e.tipo === r[9])).length
+              const disponivel = Math.max(0, total - preenchido)
+              return (
+                <div className="mt-3 pt-3 border-t border-slate-100 flex justify-between text-xs text-slate-500">
+                  <span>Total: <strong className="text-slate-700">{total}</strong></span>
+                  <span>Preenchido: <strong className="text-slate-700">{preenchido}</strong></span>
+                  <span>Disponível: <strong className={disponivel === 0 ? 'text-red-600' : 'text-emerald-600'}>{disponivel}</strong></span>
+                </div>
+              )
+            })()}
           </CardSection>
         </Card>
       </main>

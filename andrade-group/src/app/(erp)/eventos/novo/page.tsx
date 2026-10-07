@@ -7,6 +7,7 @@ import { getSupabase } from '@/lib/supabase/client'
 import { useScope } from '@/lib/erp/environment'
 import { brl, TEAM_SUGGESTIONS } from '@/lib/erp/ops'
 import { ErrorBox } from '@/components/erp/ui'
+import { CentroSelect, ClienteSelect } from '@/components/erp/registry-ui'
 
 interface TeamDraft { name: string; quantity: string; rate: string; coordinator_name: string; start_time: string; end_time: string }
 const emptyTeam = (name = ''): TeamDraft => ({ name, quantity: '', rate: '', coordinator_name: '', start_time: '', end_time: '' })
@@ -27,7 +28,7 @@ export default function NovoEventoPage() {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [e, setE] = useState({
-    code: '', name: '', client_name: '', cost_center: '', event_date: '', start_time: '', end_time: '',
+    code: '', name: '', cliente_evento_id: '', centro_custo_id: '', event_date: '', end_date: '', start_time: '', end_time: '',
     location: '', address: '', manager_name: '', notes: '', radius_m: '300', show_rate: true,
     latitude: null as number | null, longitude: null as number | null,
   })
@@ -64,6 +65,7 @@ export default function NovoEventoPage() {
   const next = () => {
     setErr(null)
     if (!e.code.trim() || !e.name.trim() || !e.event_date) return setErr('Preencha código, nome e data do evento.')
+    if (e.end_date && e.end_date < e.event_date) return setErr('A data final não pode ser anterior à data inicial.')
     if (teams.length === 0) setTeams([emptyTeam()])
     setStep(2)
     window.scrollTo({ top: 0 })
@@ -116,14 +118,16 @@ export default function NovoEventoPage() {
             <F label="Nome do evento *"><input className={field} value={e.name} onChange={set('name')} placeholder="Congresso XPTO" /></F>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            <F label="Cliente"><input className={field} value={e.client_name} onChange={set('client_name')} /></F>
-            <F label="Centro de custo"><input className={field} value={e.cost_center} onChange={set('cost_center')} /></F>
+            <ClienteSelect companyId={s.companyId!} value={e.cliente_evento_id} onChange={(v) => setE((x) => ({ ...x, cliente_evento_id: v }))} canCreate={s.canRegistry} />
+            <CentroSelect companyId={s.companyId!} value={e.centro_custo_id} onChange={(v) => setE((x) => ({ ...x, centro_custo_id: v }))} canCreate={s.canRegistry} />
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <F label="Data *"><input type="date" className={field} value={e.event_date} onChange={set('event_date')} /></F>
+            <F label="Data final"><input type="date" className={field} value={e.end_date} min={e.event_date} onChange={set('end_date')} /></F>
             <F label="Início"><input type="time" className={field} value={e.start_time} onChange={set('start_time')} /></F>
             <F label="Fim"><input type="time" className={field} value={e.end_time} onChange={set('end_time')} /></F>
           </div>
+          {e.end_date && e.end_date > e.event_date && <p className="-mt-2 text-xs text-slate-400">Evento de vários dias: cada profissional faz check-in e check-out em cada dia, na mesma inscrição.</p>}
           <div className="grid gap-3 sm:grid-cols-2">
             <F label="Local"><input className={field} value={e.location} onChange={set('location')} placeholder="Centro de Convenções" /></F>
             <F label="Responsável"><input className={field} value={e.manager_name} onChange={set('manager_name')} /></F>

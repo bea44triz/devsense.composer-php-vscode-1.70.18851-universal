@@ -11,10 +11,11 @@ import { PublicCard, PublicShell } from '@/components/erp/PublicShell'
 
 interface Info {
   team_name: string; event_name: string; event_code: string; company_name: string
-  event_date: string; start_time: string | null; end_time: string | null; location: string | null; address: string | null
+  event_date: string; end_date: string; start_time: string | null; end_time: string | null; location: string | null; address: string | null
   rate: number | null; open: boolean; vacancies: number
 }
-interface Lookup { found: boolean; first_name?: string; phone_hint?: string; email_hint?: string; has_pix?: boolean; participation_status?: ParticipantStatus | null }
+// O banco não devolve nome, telefone nem e-mail do cadastro encontrado (evita expor dados por CPF)
+interface Lookup { found?: boolean; blocked?: boolean; has_pix?: boolean; participation_status?: ParticipantStatus | null }
 
 const PIX_TIPOS = [
   { value: 'cpf', label: 'CPF', placeholder: '000.000.000-00' },
@@ -58,6 +59,7 @@ function Inscricao({ token, info }: { token: string; info: Info }) {
     setBusy(false)
     if (error) return setErr(error.message)
     const l = data as unknown as Lookup
+    if (l.blocked) return setErr('Muitas tentativas a partir desta conexão. Aguarde alguns minutos e tente novamente.')
     setLookup(l)
     if (l.participation_status) { setResult({ status: l.participation_status, already: true }); setStep('done'); return }
     setStep('form')
@@ -68,8 +70,9 @@ function Inscricao({ token, info }: { token: string; info: Info }) {
     if (isNew && !hasFullName(f.full_name)) e.full_name = 'Informe nome e sobrenome.'
     if ((isNew || f.phone) && !isValidCelular(f.phone)) e.phone = 'Celular com DDD + 9 dígitos.'
     if ((isNew || f.email) && !isValidEmail(f.email)) e.email = 'E-mail inválido.'
-    if (isNew && !f.pix_type) e.pix_type = 'Escolha o tipo da chave PIX.'
-    if ((isNew || f.pix_key || f.pix_type) && (!f.pix_type || !isValidPixKey(f.pix_key, f.pix_type))) e.pix_key = 'Chave PIX inválida para o tipo escolhido.'
+    const needPix = isNew || lookup?.has_pix === false
+    if (needPix && !f.pix_type) e.pix_type = 'Escolha o tipo da chave PIX.'
+    if ((needPix || f.pix_key || f.pix_type) && (!f.pix_type || !isValidPixKey(f.pix_key, f.pix_type))) e.pix_key = 'Chave PIX inválida para o tipo escolhido.'
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -92,7 +95,7 @@ function Inscricao({ token, info }: { token: string; info: Info }) {
   const setField = (k: keyof typeof f, v: string) => { setF((x) => ({ ...x, [k]: v })); setErrors((x) => ({ ...x, [k]: undefined })) }
 
   return (
-    <PublicShell company={info.company_name} badge={info.team_name} title={info.event_name} date={info.event_date}
+    <PublicShell company={info.company_name} badge={info.team_name} title={info.event_name} date={info.event_date} endDate={info.end_date}
       start={info.start_time} end={info.end_time} location={info.location} address={info.address}>
       <div className="grid grid-cols-2 gap-3">
         {info.rate != null && <div className="rounded-2xl border border-slate-100 bg-white p-3 shadow-sm"><div className="text-[11px] font-semibold uppercase text-slate-400">Valor</div><div className="text-xl font-black">{brl(info.rate)}</div></div>}
@@ -127,9 +130,8 @@ function Inscricao({ token, info }: { token: string; info: Info }) {
           <form onSubmit={submit} className="space-y-4" noValidate>
             {lookup?.found ? (
               <div className="rounded-2xl bg-emerald-50 p-3 text-sm text-emerald-900">
-                <b>Encontramos seu cadastro, {lookup.first_name}.</b>
-                <div className="mt-1 text-xs">Celular {lookup.phone_hint ?? '—'} · E-mail {lookup.email_hint ?? '—'} · PIX {lookup.has_pix ? 'cadastrado' : 'não cadastrado'}</div>
-                <div className="mt-1 text-xs">Preencha abaixo só o que quiser atualizar.</div>
+                <b>Encontramos seu cadastro.</b>
+                <div className="mt-1 text-xs">Preencha abaixo só o que quiser atualizar{lookup.has_pix ? '' : ' — e informe sua chave PIX, que ainda não temos'}.</div>
               </div>
             ) : (
               <Input label="Nome completo" placeholder="Nome e sobrenome" value={f.full_name} onChange={(e) => setField('full_name', e.target.value)} error={errors.full_name} icon={<User className="h-4 w-4" />} />

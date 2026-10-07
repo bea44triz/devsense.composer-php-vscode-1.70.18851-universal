@@ -1,5 +1,4 @@
-// Tipos do schema Supabase (exportados do projeto Lovable) + event_finish (migration 20261007000000) adicionado à mão.
-// Regerar com `supabase gen types typescript` depois de aplicar as migrations.
+// Gerado a partir das migrations em supabase/migrations (postgres-meta). Não editar à mão: rode supabase/gen-types.sh.
 export type Json =
   | string
   | number
@@ -9,11 +8,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.18"
-  }
   public: {
     Tables: {
       attendance: {
@@ -30,6 +24,7 @@ export type Database = {
           participant_id: string
           photo_path: string | null
           recorded_at: string
+          work_date: string
         }
         Insert: {
           accuracy_m?: number | null
@@ -44,6 +39,7 @@ export type Database = {
           participant_id: string
           photo_path?: string | null
           recorded_at?: string
+          work_date: string
         }
         Update: {
           accuracy_m?: number | null
@@ -58,12 +54,12 @@ export type Database = {
           participant_id?: string
           photo_path?: string | null
           recorded_at?: string
+          work_date?: string
         }
         Relationships: [
           {
             foreignKeyName: "attendance_participant_id_company_id_fkey"
             columns: ["participant_id", "company_id"]
-            isOneToOne: false
             referencedRelation: "event_participants"
             referencedColumns: ["id", "company_id"]
           },
@@ -170,7 +166,49 @@ export type Database = {
           {
             foreignKeyName: "bank_accounts_company_id_fkey"
             columns: ["company_id"]
-            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      centros_custo: {
+        Row: {
+          codigo: string
+          company_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          id_externo: string | null
+          nome: string
+          origem: string
+          status: string
+        }
+        Insert: {
+          codigo: string
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          id_externo?: string | null
+          nome: string
+          origem?: string
+          status?: string
+        }
+        Update: {
+          codigo?: string
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          id_externo?: string | null
+          nome?: string
+          origem?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "centros_custo_company_id_fkey"
+            columns: ["company_id"]
             referencedRelation: "companies"
             referencedColumns: ["id"]
           },
@@ -202,6 +240,55 @@ export type Database = {
           slug?: string
         }
         Relationships: []
+      }
+      clientes_evento: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string | null
+          documento: string | null
+          email: string | null
+          id: string
+          nome_fantasia: string | null
+          razao_social: string
+          status: string
+          telefone: string | null
+          tipo_pessoa: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          documento?: string | null
+          email?: string | null
+          id?: string
+          nome_fantasia?: string | null
+          razao_social: string
+          status?: string
+          telefone?: string | null
+          tipo_pessoa?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          documento?: string | null
+          email?: string | null
+          id?: string
+          nome_fantasia?: string | null
+          razao_social?: string
+          status?: string
+          telefone?: string | null
+          tipo_pessoa?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clientes_evento_company_id_fkey"
+            columns: ["company_id"]
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       companies: {
         Row: {
@@ -241,7 +328,6 @@ export type Database = {
           {
             foreignKeyName: "companies_group_id_fkey"
             columns: ["group_id"]
-            isOneToOne: false
             referencedRelation: "client_groups"
             referencedColumns: ["id"]
           },
@@ -267,7 +353,6 @@ export type Database = {
           {
             foreignKeyName: "company_user_permissions_company_id_user_id_fkey"
             columns: ["company_id", "user_id"]
-            isOneToOne: false
             referencedRelation: "company_users"
             referencedColumns: ["company_id", "user_id"]
           },
@@ -296,7 +381,6 @@ export type Database = {
           {
             foreignKeyName: "company_users_company_id_fkey"
             columns: ["company_id"]
-            isOneToOne: false
             referencedRelation: "companies"
             referencedColumns: ["id"]
           },
@@ -361,21 +445,18 @@ export type Database = {
           {
             foreignKeyName: "event_participants_event_id_company_id_fkey"
             columns: ["event_id", "company_id"]
-            isOneToOne: false
             referencedRelation: "events"
             referencedColumns: ["id", "company_id"]
           },
           {
             foreignKeyName: "event_participants_person_id_company_id_fkey"
             columns: ["person_id", "company_id"]
-            isOneToOne: false
             referencedRelation: "people"
             referencedColumns: ["id", "company_id"]
           },
           {
             foreignKeyName: "event_participants_team_id_company_id_fkey"
             columns: ["team_id", "company_id"]
-            isOneToOne: false
             referencedRelation: "event_teams"
             referencedColumns: ["id", "company_id"]
           },
@@ -428,7 +509,6 @@ export type Database = {
           {
             foreignKeyName: "event_teams_event_id_company_id_fkey"
             columns: ["event_id", "company_id"]
-            isOneToOne: false
             referencedRelation: "events"
             referencedColumns: ["id", "company_id"]
           },
@@ -437,9 +517,11 @@ export type Database = {
       events: {
         Row: {
           address: string | null
+          centro_custo_id: string | null
           checkin_token: string
           checkout_token: string
           client_name: string | null
+          cliente_evento_id: string | null
           closed_at: string | null
           closed_by: string | null
           code: string
@@ -447,6 +529,7 @@ export type Database = {
           cost_center: string | null
           created_at: string
           created_by: string | null
+          end_date: string | null
           end_time: string | null
           event_date: string
           id: string
@@ -463,9 +546,11 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          centro_custo_id?: string | null
           checkin_token?: string
           checkout_token?: string
           client_name?: string | null
+          cliente_evento_id?: string | null
           closed_at?: string | null
           closed_by?: string | null
           code: string
@@ -473,6 +558,7 @@ export type Database = {
           cost_center?: string | null
           created_at?: string
           created_by?: string | null
+          end_date?: string | null
           end_time?: string | null
           event_date: string
           id: string
@@ -489,9 +575,11 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          centro_custo_id?: string | null
           checkin_token?: string
           checkout_token?: string
           client_name?: string | null
+          cliente_evento_id?: string | null
           closed_at?: string | null
           closed_by?: string | null
           code?: string
@@ -499,6 +587,7 @@ export type Database = {
           cost_center?: string | null
           created_at?: string
           created_by?: string | null
+          end_date?: string | null
           end_time?: string | null
           event_date?: string
           id?: string
@@ -515,9 +604,20 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "events_centro_custo_fk"
+            columns: ["centro_custo_id", "company_id"]
+            referencedRelation: "centros_custo"
+            referencedColumns: ["id", "company_id"]
+          },
+          {
+            foreignKeyName: "events_cliente_fk"
+            columns: ["cliente_evento_id", "company_id"]
+            referencedRelation: "clientes_evento"
+            referencedColumns: ["id", "company_id"]
+          },
+          {
             foreignKeyName: "events_id_company_id_fkey"
             columns: ["id", "company_id"]
-            isOneToOne: true
             referencedRelation: "operations"
             referencedColumns: ["id", "company_id"]
           },
@@ -564,14 +664,12 @@ export type Database = {
           {
             foreignKeyName: "fixed_post_members_fixed_post_id_company_id_fkey"
             columns: ["fixed_post_id", "company_id"]
-            isOneToOne: false
             referencedRelation: "fixed_posts"
             referencedColumns: ["id", "company_id"]
           },
           {
             foreignKeyName: "fixed_post_members_person_id_company_id_fkey"
             columns: ["person_id", "company_id"]
-            isOneToOne: false
             referencedRelation: "people"
             referencedColumns: ["id", "company_id"]
           },
@@ -590,6 +688,7 @@ export type Database = {
           notes: string | null
           period_id: string
           person_id: string
+          status: string
         }
         Insert: {
           absences?: number
@@ -603,6 +702,7 @@ export type Database = {
           notes?: string | null
           period_id: string
           person_id: string
+          status?: string
         }
         Update: {
           absences?: number
@@ -616,26 +716,24 @@ export type Database = {
           notes?: string | null
           period_id?: string
           person_id?: string
+          status?: string
         }
         Relationships: [
           {
             foreignKeyName: "fixed_post_period_items_member_id_company_id_fkey"
             columns: ["member_id", "company_id"]
-            isOneToOne: false
             referencedRelation: "fixed_post_members"
             referencedColumns: ["id", "company_id"]
           },
           {
             foreignKeyName: "fixed_post_period_items_period_id_company_id_fkey"
             columns: ["period_id", "company_id"]
-            isOneToOne: false
             referencedRelation: "fixed_post_periods"
             referencedColumns: ["id", "company_id"]
           },
           {
             foreignKeyName: "fixed_post_period_items_person_id_company_id_fkey"
             columns: ["person_id", "company_id"]
-            isOneToOne: false
             referencedRelation: "people"
             referencedColumns: ["id", "company_id"]
           },
@@ -679,7 +777,6 @@ export type Database = {
           {
             foreignKeyName: "fixed_post_periods_fixed_post_id_company_id_fkey"
             columns: ["fixed_post_id", "company_id"]
-            isOneToOne: false
             referencedRelation: "fixed_posts"
             referencedColumns: ["id", "company_id"]
           },
@@ -687,8 +784,11 @@ export type Database = {
       }
       fixed_posts: {
         Row: {
+          address: string | null
           category: string | null
+          centro_custo_id: string | null
           client_name: string | null
+          cliente_evento_id: string | null
           code: string
           company_id: string
           cost_center: string | null
@@ -698,12 +798,18 @@ export type Database = {
           location: string | null
           manager_name: string | null
           name: string
+          notes: string | null
           planned_headcount: number
+          start_date: string | null
           status: string
+          subcategory: string | null
         }
         Insert: {
+          address?: string | null
           category?: string | null
+          centro_custo_id?: string | null
           client_name?: string | null
+          cliente_evento_id?: string | null
           code: string
           company_id: string
           cost_center?: string | null
@@ -713,12 +819,18 @@ export type Database = {
           location?: string | null
           manager_name?: string | null
           name: string
+          notes?: string | null
           planned_headcount?: number
+          start_date?: string | null
           status?: string
+          subcategory?: string | null
         }
         Update: {
+          address?: string | null
           category?: string | null
+          centro_custo_id?: string | null
           client_name?: string | null
+          cliente_evento_id?: string | null
           code?: string
           company_id?: string
           cost_center?: string | null
@@ -728,16 +840,91 @@ export type Database = {
           location?: string | null
           manager_name?: string | null
           name?: string
+          notes?: string | null
           planned_headcount?: number
+          start_date?: string | null
           status?: string
+          subcategory?: string | null
         }
         Relationships: [
           {
+            foreignKeyName: "fixed_posts_centro_custo_fk"
+            columns: ["centro_custo_id", "company_id"]
+            referencedRelation: "centros_custo"
+            referencedColumns: ["id", "company_id"]
+          },
+          {
+            foreignKeyName: "fixed_posts_cliente_fk"
+            columns: ["cliente_evento_id", "company_id"]
+            referencedRelation: "clientes_evento"
+            referencedColumns: ["id", "company_id"]
+          },
+          {
             foreignKeyName: "fixed_posts_id_company_id_fkey"
             columns: ["id", "company_id"]
-            isOneToOne: true
             referencedRelation: "operations"
             referencedColumns: ["id", "company_id"]
+          },
+        ]
+      }
+      fornecedores: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string | null
+          documento: string | null
+          email: string | null
+          has_pix: boolean | null
+          id: string
+          nome_fantasia: string | null
+          pix_key: string | null
+          pix_key_masked: string | null
+          pix_type: string | null
+          razao_social: string
+          servico: string | null
+          status: string
+          telefone: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          documento?: string | null
+          email?: string | null
+          has_pix?: boolean | null
+          id?: string
+          nome_fantasia?: string | null
+          pix_key?: string | null
+          pix_key_masked?: string | null
+          pix_type?: string | null
+          razao_social: string
+          servico?: string | null
+          status?: string
+          telefone?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          documento?: string | null
+          email?: string | null
+          has_pix?: boolean | null
+          id?: string
+          nome_fantasia?: string | null
+          pix_key?: string | null
+          pix_key_masked?: string | null
+          pix_type?: string | null
+          razao_social?: string
+          servico?: string | null
+          status?: string
+          telefone?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fornecedores_company_id_fkey"
+            columns: ["company_id"]
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -764,9 +951,48 @@ export type Database = {
           {
             foreignKeyName: "group_memberships_group_id_fkey"
             columns: ["group_id"]
-            isOneToOne: false
             referencedRelation: "client_groups"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      operation_members: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string | null
+          operation_id: string
+          role: Database["public"]["Enums"]["operation_role"]
+          user_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          operation_id: string
+          role?: Database["public"]["Enums"]["operation_role"]
+          user_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          operation_id?: string
+          role?: Database["public"]["Enums"]["operation_role"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "operation_members_company_id_user_id_fkey"
+            columns: ["company_id", "user_id"]
+            referencedRelation: "company_users"
+            referencedColumns: ["company_id", "user_id"]
+          },
+          {
+            foreignKeyName: "operation_members_operation_id_company_id_fkey"
+            columns: ["operation_id", "company_id"]
+            referencedRelation: "operations"
+            referencedColumns: ["id", "company_id"]
           },
         ]
       }
@@ -802,7 +1028,6 @@ export type Database = {
           {
             foreignKeyName: "operations_company_id_fkey"
             columns: ["company_id"]
-            isOneToOne: false
             referencedRelation: "companies"
             referencedColumns: ["id"]
           },
@@ -812,6 +1037,7 @@ export type Database = {
         Row: {
           amount: number
           bank_account_id: string | null
+          centro_custo_id: string | null
           company_id: string
           competence: string | null
           cost_center: string | null
@@ -839,6 +1065,7 @@ export type Database = {
         Insert: {
           amount: number
           bank_account_id?: string | null
+          centro_custo_id?: string | null
           company_id: string
           competence?: string | null
           cost_center?: string | null
@@ -866,6 +1093,7 @@ export type Database = {
         Update: {
           amount?: number
           bank_account_id?: string | null
+          centro_custo_id?: string | null
           company_id?: string
           competence?: string | null
           cost_center?: string | null
@@ -894,42 +1122,42 @@ export type Database = {
           {
             foreignKeyName: "payables_bank_account_id_company_id_fkey"
             columns: ["bank_account_id", "company_id"]
-            isOneToOne: false
             referencedRelation: "bank_accounts"
+            referencedColumns: ["id", "company_id"]
+          },
+          {
+            foreignKeyName: "payables_centro_custo_fk"
+            columns: ["centro_custo_id", "company_id"]
+            referencedRelation: "centros_custo"
             referencedColumns: ["id", "company_id"]
           },
           {
             foreignKeyName: "payables_company_id_fkey"
             columns: ["company_id"]
-            isOneToOne: false
             referencedRelation: "companies"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "payables_operation_id_company_id_fkey"
             columns: ["operation_id", "company_id"]
-            isOneToOne: false
             referencedRelation: "operations"
             referencedColumns: ["id", "company_id"]
           },
           {
             foreignKeyName: "payables_participant_fk"
             columns: ["event_participant_id", "company_id"]
-            isOneToOne: false
             referencedRelation: "event_participants"
             referencedColumns: ["id", "company_id"]
           },
           {
             foreignKeyName: "payables_period_item_fk"
             columns: ["period_item_id", "company_id"]
-            isOneToOne: false
             referencedRelation: "fixed_post_period_items"
             referencedColumns: ["id", "company_id"]
           },
           {
             foreignKeyName: "payables_person_fk"
             columns: ["person_id", "company_id"]
-            isOneToOne: false
             referencedRelation: "people"
             referencedColumns: ["id", "company_id"]
           },
@@ -942,10 +1170,12 @@ export type Database = {
           created_at: string
           email: string | null
           full_name: string
+          has_pix: boolean | null
           id: string
           main_role: string | null
           phone: string | null
           pix_key: string | null
+          pix_key_masked: string | null
           pix_type: string | null
           pix_updated_publicly_at: string | null
           status: string
@@ -956,10 +1186,12 @@ export type Database = {
           created_at?: string
           email?: string | null
           full_name: string
+          has_pix?: boolean | null
           id?: string
           main_role?: string | null
           phone?: string | null
           pix_key?: string | null
+          pix_key_masked?: string | null
           pix_type?: string | null
           pix_updated_publicly_at?: string | null
           status?: string
@@ -970,10 +1202,12 @@ export type Database = {
           created_at?: string
           email?: string | null
           full_name?: string
+          has_pix?: boolean | null
           id?: string
           main_role?: string | null
           phone?: string | null
           pix_key?: string | null
+          pix_key_masked?: string | null
           pix_type?: string | null
           pix_updated_publicly_at?: string | null
           status?: string
@@ -982,7 +1216,6 @@ export type Database = {
           {
             foreignKeyName: "people_company_id_fkey"
             columns: ["company_id"]
-            isOneToOne: false
             referencedRelation: "companies"
             referencedColumns: ["id"]
           },
@@ -1024,6 +1257,39 @@ export type Database = {
         }
         Relationships: []
       }
+      public_link_attempts: {
+        Row: {
+          company_id: string | null
+          cpf_hash: string | null
+          created_at: string
+          id: number
+          ip: string
+          kind: string
+          outcome: string
+          token_hash: string
+        }
+        Insert: {
+          company_id?: string | null
+          cpf_hash?: string | null
+          created_at?: string
+          id?: number
+          ip: string
+          kind: string
+          outcome: string
+          token_hash: string
+        }
+        Update: {
+          company_id?: string | null
+          cpf_hash?: string | null
+          created_at?: string
+          id?: number
+          ip?: string
+          kind?: string
+          outcome?: string
+          token_hash?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -1041,16 +1307,103 @@ export type Database = {
         Args: { _company_id: string }
         Returns: boolean
       }
-      can_view_consolidated: { Args: { _group_id: string }; Returns: boolean }
-      event_send_to_finance: { Args: { _event_id: string }; Returns: number }
-      event_finish: { Args: { _event_id: string }; Returns: undefined }
-      event_create: { Args: { _company_id: string; _event: Json; _teams: Json }; Returns: string }
+      can_manage_operation: {
+        Args: { _company: string; _op: string }
+        Returns: boolean
+      }
+      can_manage_registry: {
+        Args: { _company: string }
+        Returns: boolean
+      }
+      can_read_registry: {
+        Args: { _company: string }
+        Returns: boolean
+      }
+      can_see_operation: {
+        Args: { _company: string; _op: string }
+        Returns: boolean
+      }
+      can_see_participant: {
+        Args: { _participant: string }
+        Returns: boolean
+      }
+      can_see_period: {
+        Args: { _manage?: boolean; _period: string }
+        Returns: boolean
+      }
+      can_see_person: {
+        Args: { _company: string; _person: string }
+        Returns: boolean
+      }
+      can_view_consolidated: {
+        Args: { _group_id: string }
+        Returns: boolean
+      }
+      cc_label: {
+        Args: { _cc: string }
+        Returns: string
+      }
+      company_assignable_users: {
+        Args: { _company_id: string }
+        Returns: {
+          email: string
+          full_name: string
+          user_id: string
+        }[]
+      }
+      event_create: {
+        Args: { _company_id: string; _event: Json; _teams: Json }
+        Returns: string
+      }
+      event_finish: {
+        Args: { _event_id: string }
+        Returns: undefined
+      }
+      event_send_to_finance: {
+        Args: { _event_id: string }
+        Returns: number
+      }
+      event_update_refs: {
+        Args: {
+          _cc: string
+          _cliente: string
+          _end_date: string
+          _event_id: string
+        }
+        Returns: undefined
+      }
+      fixed_post_create: {
+        Args: { _company_id: string; _data: Json }
+        Returns: string
+      }
       fixed_post_open_period: {
         Args: { _competence: string; _fixed_post_id: string }
         Returns: string
       }
-      fixed_post_send_period: { Args: { _period_id: string }; Returns: number }
-      has_company_access: { Args: { _company_id: string }; Returns: boolean }
+      fixed_post_reopen_period: {
+        Args: { _period_id: string }
+        Returns: undefined
+      }
+      fixed_post_send_period: {
+        Args: { _period_id: string }
+        Returns: number
+      }
+      fixed_post_validate_period: {
+        Args: { _period_id: string }
+        Returns: undefined
+      }
+      fornecedor_pix: {
+        Args: { _fornecedor: string }
+        Returns: {
+          full_access: boolean
+          pix_key: string
+          pix_type: string
+        }[]
+      }
+      has_company_access: {
+        Args: { _company_id: string }
+        Returns: boolean
+      }
       has_company_permission: {
         Args: {
           _company_id: string
@@ -1058,9 +1411,65 @@ export type Database = {
         }
         Returns: boolean
       }
-      has_group_access: { Args: { _group_id: string }; Returns: boolean }
-      is_group_admin: { Args: { _group_id: string }; Returns: boolean }
-      is_platform_admin: { Args: never; Returns: boolean }
+      has_group_access: {
+        Args: { _group_id: string }
+        Returns: boolean
+      }
+      hash_text: {
+        Args: { _t: string }
+        Returns: string
+      }
+      in_operation_scope: {
+        Args: { _company: string; _op: string }
+        Returns: boolean
+      }
+      is_group_admin: {
+        Args: { _group_id: string }
+        Returns: boolean
+      }
+      is_platform_admin: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      is_valid_celular: {
+        Args: { _phone: string }
+        Returns: boolean
+      }
+      is_valid_cnpj: {
+        Args: { _cnpj: string }
+        Returns: boolean
+      }
+      is_valid_cpf: {
+        Args: { _cpf: string }
+        Returns: boolean
+      }
+      is_valid_email: {
+        Args: { _email: string }
+        Returns: boolean
+      }
+      is_valid_pix: {
+        Args: { _chave: string; _tipo: string }
+        Returns: boolean
+      }
+      link_log: {
+        Args: {
+          _company: string
+          _cpf: string
+          _ip: string
+          _kind: string
+          _outcome: string
+          _token: string
+        }
+        Returns: undefined
+      }
+      link_rate_limited: {
+        Args: { _cpf_hash: string; _ip: string }
+        Returns: boolean
+      }
+      local_today: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       my_company_context: {
         Args: { _group_id: string }
         Returns: {
@@ -1071,15 +1480,67 @@ export type Database = {
         }[]
       }
       my_tenants: {
-        Args: never
+        Args: Record<PropertyKey, never>
         Returns: {
           id: string
           name: string
           slug: string
         }[]
       }
-      presence_photo_company: { Args: { _token: string }; Returns: string }
-      public_invite_info: { Args: { _token: string }; Returns: Json }
+      new_link_token: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      normalize_pix: {
+        Args: { _chave: string; _tipo: string }
+        Returns: string
+      }
+      only_digits: {
+        Args: { _t: string }
+        Returns: string
+      }
+      operation_member_set: {
+        Args: {
+          _op: string
+          _remove?: boolean
+          _role: Database["public"]["Enums"]["operation_role"]
+          _user: string
+        }
+        Returns: undefined
+      }
+      operation_members_list: {
+        Args: { _op: string }
+        Returns: {
+          email: string
+          full_name: string
+          role: Database["public"]["Enums"]["operation_role"]
+          user_id: string
+        }[]
+      }
+      person_pix: {
+        Args: { _person: string }
+        Returns: {
+          full_access: boolean
+          pix_key: string
+          pix_type: string
+        }[]
+      }
+      person_upsert: {
+        Args: { _company_id: string; _data: Json }
+        Returns: string
+      }
+      presence_photo_company: {
+        Args: { _token: string }
+        Returns: string
+      }
+      presence_photo_folder: {
+        Args: { _token: string }
+        Returns: string
+      }
+      public_invite_info: {
+        Args: { _token: string }
+        Returns: Json
+      }
       public_invite_lookup: {
         Args: { _cpf: string; _token: string }
         Returns: Json
@@ -1088,7 +1549,14 @@ export type Database = {
         Args: { _data: Json; _token: string }
         Returns: Json
       }
-      public_presence_info: { Args: { _token: string }; Returns: Json }
+      public_link_check: {
+        Args: { _cpf: string; _ip?: string; _kind: string; _token: string }
+        Returns: boolean
+      }
+      public_presence_info: {
+        Args: { _token: string }
+        Returns: Json
+      }
       public_presence_lookup: {
         Args: { _cpf: string; _token: string }
         Returns: Json
@@ -1097,6 +1565,7 @@ export type Database = {
         Args: {
           _accuracy: number
           _address: string
+          _client_ip?: string
           _cpf: string
           _lat: number
           _lng: number
@@ -1104,6 +1573,10 @@ export type Database = {
           _token: string
         }
         Returns: Json
+      }
+      request_ip: {
+        Args: { _override?: string }
+        Returns: string
       }
       resolve_tenant: {
         Args: { _host: string; _slug?: string }
@@ -1113,7 +1586,18 @@ export type Database = {
           slug: string
         }[]
       }
-      shares_scope_with: { Args: { _user: string }; Returns: boolean }
+      rotate_link: {
+        Args: { _id: string; _kind: string }
+        Returns: string
+      }
+      shares_scope_with: {
+        Args: { _user: string }
+        Returns: boolean
+      }
+      team_name_key: {
+        Args: { _name: string }
+        Returns: string
+      }
     }
     Enums: {
       app_permission:
@@ -1128,7 +1612,9 @@ export type Database = {
         | "operacao.gerenciar"
         | "consolidado.ver"
         | "auditoria.ver"
+        | "operacao.todos"
       group_role: "owner" | "admin"
+      operation_role: "responsavel" | "coordenador" | "lider"
       operation_type: "EVENTO" | "PONTO_FIXO"
       payable_status:
         | "pendente_validacao"
@@ -1179,8 +1665,7 @@ export type Tables<
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
+    keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals },
   TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
@@ -1204,8 +1689,7 @@ export type TablesInsert<
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
+    keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals },
   TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
@@ -1229,8 +1713,7 @@ export type TablesUpdate<
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema["Enums"]
-    | { schema: keyof DatabaseWithoutInternals },
+    keyof DefaultSchema["Enums"] | { schema: keyof DatabaseWithoutInternals },
   EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
@@ -1276,8 +1759,10 @@ export const Constants = {
         "operacao.gerenciar",
         "consolidado.ver",
         "auditoria.ver",
+        "operacao.todos",
       ],
       group_role: ["owner", "admin"],
+      operation_role: ["responsavel", "coordenador", "lider"],
       operation_type: ["EVENTO", "PONTO_FIXO"],
       payable_status: [
         "pendente_validacao",
@@ -1290,3 +1775,4 @@ export const Constants = {
     },
   },
 } as const
+

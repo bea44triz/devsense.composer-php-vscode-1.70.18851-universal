@@ -20,3 +20,9 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON storage.objects TO authenticated, servic
 CREATE FUNCTION storage.foldername(name text) RETURNS text[] LANGUAGE sql IMMUTABLE AS $$
   SELECT (string_to_array(name, '/'))[1:array_length(string_to_array(name,'/'),1)-1] $$;
 GRANT EXECUTE ON FUNCTION storage.foldername TO anon, authenticated, service_role;
+
+-- Igual ao Supabase: objetos criados no schema public recebem privilégios padrão para anon/authenticated/service_role.
+-- (Sem isto o teste local seria mais "seguro" que o ambiente real.)
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO anon, authenticated, service_role;

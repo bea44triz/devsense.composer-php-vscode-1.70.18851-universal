@@ -23,6 +23,10 @@ INSERT INTO company_user_permissions VALUES
  ('c0000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-0000000000b1', 'financeiro.ver'),
  ('c0000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-0000000000b2', 'operacao.gerenciar');
 
+-- cadastros da 061 (feitos pelo administrador)
+INSERT INTO clientes_evento(id, company_id, razao_social, documento) VALUES ('d1000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000002', 'Cliente X Ltda', '11.222.333/0001-81');
+INSERT INTO centros_custo(id, company_id, codigo, nome) VALUES ('d2000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000002', 'CC-01', 'Eventos corporativos');
+
 -- ===== 1) Criar evento e equipes (líder da 061) =====
 SELECT pg_temp.as_user('00000000-0000-0000-0000-0000000000b1'); SET ROLE authenticated;
 DO $$ BEGIN
@@ -40,8 +44,8 @@ DO $$ BEGIN
   INSERT INTO r VALUES ('1.4 líder da 061 cria evento na MKTG', 'recusado', 'aceito', false);
 EXCEPTION WHEN OTHERS THEN INSERT INTO r VALUES ('1.4 líder da 061 cria evento na MKTG', 'recusado', 'recusado: ' || SQLERRM, SQLERRM LIKE 'Sem permissão%'); END $$;
 INSERT INTO ctx SELECT 'ev1', event_create('c0000000-0000-0000-0000-000000000002',
-  jsonb_build_object('code','EV-T1','name','Congresso  Teste','client_name','Cliente X','cost_center','CC-01',
-    'event_date', current_date::text,'start_time','08:00','end_time','18:00','location','Centro de Convenções',
+  jsonb_build_object('code','EV-T1','name','Congresso  Teste','cliente_evento_id','d1000000-0000-0000-0000-000000000001','centro_custo_id','d2000000-0000-0000-0000-000000000001',
+    'event_date', local_today()::text,'start_time','08:00','end_time','18:00','location','Centro de Convenções',
     'latitude','-15.7801','longitude','-47.9292','radius_m','300','manager_name','Carlos'),
   '[{"name":"Segurança","quantity":1,"rate":180,"coordinator_name":"Carlos","start_time":"18:00","end_time":"02:00"},
     {"name":"Recepção","quantity":2,"rate":160,"coordinator_name":"Maria"}]')::text;
@@ -58,9 +62,9 @@ INSERT INTO ctx SELECT 'tok_rec', invite_token FROM event_teams WHERE name = 'Re
 INSERT INTO ctx SELECT 'tok_in', checkin_token FROM events WHERE id = pg_temp.c('ev1')::uuid;
 INSERT INTO ctx SELECT 'tok_out', checkout_token FROM events WHERE id = pg_temp.c('ev1')::uuid;
 -- segundo evento (para testar presença cruzada entre eventos)
-INSERT INTO operations(id, company_id, type, name) VALUES ('e1000000-0000-0000-0000-000000000002', 'c0000000-0000-0000-0000-000000000002', 'EVENTO', 'Outro evento');
-INSERT INTO events(id, company_id, code, name, event_date) VALUES ('e1000000-0000-0000-0000-000000000002', 'c0000000-0000-0000-0000-000000000002', 'EV-T2', 'Outro evento', current_date);
-INSERT INTO ctx SELECT 'tok_in2', checkin_token FROM events WHERE id = 'e1000000-0000-0000-0000-000000000002';
+INSERT INTO ctx SELECT 'ev2', event_create('c0000000-0000-0000-0000-000000000002',
+  jsonb_build_object('code','EV-T2','name','Outro evento','event_date', local_today()::text), '[{"name":"Apoio","quantity":1}]')::text;
+INSERT INTO ctx SELECT 'tok_in2', checkin_token FROM events WHERE id = pg_temp.c('ev2')::uuid;
 INSERT INTO r SELECT '1.1 links gerados (2 inscrição + check-in + check-out)', '4', count(*)::text, count(*) = 4 FROM ctx WHERE k IN ('tok_seg','tok_rec','tok_in','tok_out');
 RESET ROLE;
 
@@ -132,7 +136,7 @@ DO $$ BEGIN
   PERFORM record_presence(pg_temp.c('tok_in'), '03951728450', -15.7801, -47.9292, 10, 'x', 'p.jpg');
   INSERT INTO r VALUES ('4.1 anon chama record_presence direto', 'negado', 'permitido', false);
 EXCEPTION WHEN OTHERS THEN INSERT INTO r VALUES ('4.1 anon chama record_presence direto', 'negado', 'negado: ' || SQLERRM, true); END $$;
-INSERT INTO r SELECT '4.2 lookup check-in acha a Ana confirmada', 'Ana Teste/confirmado', (l->>'name') || '/' || (l->>'status'), l->>'status' = 'confirmado'
+INSERT INTO r SELECT '4.2 lookup check-in acha a Ana confirmada (nome mascarado)', 'Ana T./confirmado', (l->>'name') || '/' || (l->>'status'), l->>'name' = 'Ana T.' AND l->>'status' = 'confirmado'
 FROM (SELECT public_presence_lookup(pg_temp.c('tok_in'), '039.517.284-50') l) x;
 RESET ROLE;
 SET ROLE service_role;  -- equivalente ao Route Handler /api/presenca
@@ -151,11 +155,11 @@ EXCEPTION WHEN OTHERS THEN INSERT INTO r VALUES ('4.6 check-out sem check-in', '
 DO $$ BEGIN
   PERFORM record_presence(pg_temp.c('tok_in2'), '03951728450', -15.7801, -47.9292, 10, 'x', 'c2/a2.jpg');
   INSERT INTO r VALUES ('4.7 Ana usa o link de presença de OUTRO evento', 'recusado', 'aceito', false);
-EXCEPTION WHEN OTHERS THEN INSERT INTO r VALUES ('4.7 Ana usa o link de presença de OUTRO evento', 'recusado', 'recusado: ' || SQLERRM, SQLERRM LIKE 'Participação não encontrada%'); END $$;
+EXCEPTION WHEN OTHERS THEN INSERT INTO r VALUES ('4.7 Ana usa o link de presença de OUTRO evento', 'recusado', 'recusado: ' || SQLERRM, SQLERRM LIKE 'Não foi possível localizar%'); END $$;
 DO $$ BEGIN
   PERFORM record_presence(pg_temp.c('tok_in'), '03951728450', -15.7801, -47.9292, 10, 'x', 'c2/a3.jpg');
-  INSERT INTO r VALUES ('4.8 segundo check-in da Ana', 'recusado', 'aceito', false);
-EXCEPTION WHEN OTHERS THEN INSERT INTO r VALUES ('4.8 segundo check-in da Ana', 'recusado', 'recusado: ' || SQLERRM, SQLERRM LIKE 'Registro já realizado%'); END $$;
+  INSERT INTO r VALUES ('4.8 segundo check-in da Ana no mesmo dia', 'recusado', 'aceito', false);
+EXCEPTION WHEN OTHERS THEN INSERT INTO r VALUES ('4.8 segundo check-in da Ana no mesmo dia', 'recusado', 'recusado: ' || SQLERRM, SQLERRM LIKE 'Check-in de hoje já registrado%'); END $$;
 INSERT INTO r SELECT '4.9 check-out da Ana', 'checkout', x->>'kind', x->>'kind' = 'checkout'
 FROM (SELECT record_presence(pg_temp.c('tok_out'), '03951728450', -15.7801, -47.9292, 9, 'Centro', 'c2/a4.jpg') x) s;
 INSERT INTO r SELECT '4.10 evento passou a "em andamento" no 1º check-in', 'em_andamento', status, status = 'em_andamento'
@@ -202,7 +206,7 @@ INSERT INTO r SELECT '5.8 lançamento com dados da operação (sem redigitar)',
             (SELECT name FROM companies WHERE id = company_id), origin, status),
   concat_ws('|', payee_name, payee_document, pix_type, pix_key, amount, op_code, op_name, origin, status)
     = 'Ana Teste|03951728450|cpf|03951728450|200.00|EV-T1|Congresso Teste|EVENTO|a_pagar'
-    AND ref_date = current_date AND cost_center = 'CC-01' AND company_id = 'c0000000-0000-0000-0000-000000000002'
+    AND ref_date = local_today() AND cost_center = 'CC-01 — Eventos corporativos' AND centro_custo_id = 'd2000000-0000-0000-0000-000000000001' AND company_id = 'c0000000-0000-0000-0000-000000000002'
 FROM payables WHERE payee_document = '03951728450';
 DO $$ BEGIN
   PERFORM event_send_to_finance(pg_temp.c('ev1')::uuid);

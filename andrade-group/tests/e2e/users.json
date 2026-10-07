@@ -1,0 +1,18 @@
+[
+  {"id":"00000000-0000-0000-0000-00000000aa01","email":"lider@061.test","password":"senha-teste"},
+  {"id":"00000000-0000-0000-0000-00000000aa02","email":"operacao@mktg.test","password":"senha-teste"},
+  {"id":"00000000-0000-0000-0000-00000000aa03","email":"dono@061mktg.test","password":"senha-teste"},
+  {"id":"00000000-0000-0000-0000-00000000aa04","email":"lider@andrade.test","password":"senha-teste"},
+  {"id":"00000000-0000-0000-0000-00000000aa05","email":"gestor@andrade.test","password":"senha-teste"},
+  {"id":"00000000-0000-0000-0000-00000000aa06","email":"carlos@andrade.test","password":"senha-teste"},
+  {"id":"00000000-0000-0000-0000-00000000aa07","email":"financeiro@andrade.test","password":"senha-teste"},
+  {"id":"00000000-0000-0000-0000-00000000aa08","email":"outro.coord@andrade.test","password":"senha-teste"},
+  {"id":"00000000-0000-0000-0000-00000000bb00","email":"stg.superadmin@staging.test","password":"senha-teste"},
+  {"id":"00000000-0000-0000-0000-00000000bb01","email":"stg.andrade@staging.test","password":"senha-teste"},
+  {"id":"00000000-0000-0000-0000-00000000bb02","email":"stg.gestor061@staging.test","password":"senha-teste"},
+  {"id":"00000000-0000-0000-0000-00000000bb03","email":"stg.mktg@staging.test","password":"senha-teste"},
+  {"id":"00000000-0000-0000-0000-00000000bb04","email":"stg.dono@staging.test","password":"senha-teste"},
+  {"id":"00000000-0000-0000-0000-00000000bb05","email":"stg.coorda@staging.test","password":"senha-teste"},
+  {"id":"00000000-0000-0000-0000-00000000bb06","email":"stg.coordb@staging.test","password":"senha-teste"},
+  {"id":"00000000-0000-0000-0000-00000000bb07","email":"stg.financeiro@staging.test","password":"senha-teste"}
+]

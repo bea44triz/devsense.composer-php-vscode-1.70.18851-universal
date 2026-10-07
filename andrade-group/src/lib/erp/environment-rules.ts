@@ -3,7 +3,7 @@ export type Permission =
   | "empresa.admin" | "usuarios.gerenciar"
   | "bancos.ver" | "bancos.gerenciar" | "bancos.aceitar_divergencia"
   | "financeiro.ver" | "financeiro.gerenciar"
-  | "operacao.ver" | "operacao.gerenciar"
+  | "operacao.ver" | "operacao.gerenciar" | "operacao.todos"
   | "consolidado.ver" | "auditoria.ver";
 
 export const PERMISSION_LABELS: Record<Permission, string> = {
@@ -16,6 +16,7 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   "financeiro.gerenciar": "Gerenciar financeiro",
   "operacao.ver": "Ver operação",
   "operacao.gerenciar": "Gerenciar operação",
+  "operacao.todos": "Ver todas as operações da empresa",
   "consolidado.ver": "Ver consolidado",
   "auditoria.ver": "Ver auditoria",
 };

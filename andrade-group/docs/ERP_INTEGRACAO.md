@@ -120,7 +120,7 @@ Testes:   supabase/tests/isolation_fase1.sql · supabase/tests/marco1_fluxo_even
 | 5 — Corte do legado | Migrar dados do Sheets (staging), redirecionar links antigos, desligar NextAuth/Sheets |
 
 **Regras de trabalho:**
-- Nada de push, merge, deploy ou alteração no Supabase remoto sem autorização.
+- Push só na branch de trabalho autorizada; nada de merge, release, deploy, DNS ou alteração no Supabase de produção sem autorização.
 - Migrations são testadas em Postgres local com `supabase/tests/local/supabase_shim.sql`.
 - Antes de aplicar no remoto: `supabase db lint` / advisors e os testes de RLS no staging.
 
@@ -136,11 +136,7 @@ Testes:   supabase/tests/isolation_fase1.sql · supabase/tests/marco1_fluxo_even
 As variáveis do legado (`GOOGLE_*`, `AUTH_SECRET`, `NEXTAUTH_URL`) continuam valendo para `/gerenciador/*`. Sem as variáveis do Supabase, o ERP mostra um aviso e o legado segue funcionando.
 
 ### Primeiro acesso (depois de aplicar as migrations)
-Ainda não há tela de usuários (Marco 4). Para liberar um líder, rode no SQL Editor, com o usuário já criado no Auth:
-```sql
-INSERT INTO company_users (company_id, user_id) SELECT '<id da empresa>', id FROM auth.users WHERE email = '<email>';
-INSERT INTO company_user_permissions SELECT '<id da empresa>', id, 'operacao.gerenciar' FROM auth.users WHERE email = '<email>';
-```
+Ainda não há tela de usuários (Marco 4). Primeiro Super Admin, vínculos e permissões: ver `docs/STAGING.md` §3.
 
 ### Testes
 | Teste | Comando | Resultado no Marco 1 |
@@ -153,3 +149,37 @@ INSERT INTO company_user_permissions SELECT '<id da empresa>', id, 'operacao.ger
 - Roda uma pilha 100% local: Postgres + PostgREST real + um gateway que imita Auth e Storage.
 - **Valida:** telas, RLS, RPCs e a regra de não expor o `service_role`.
 - **Não valida:** o GoTrue nem o Storage reais do Supabase. Para isso é preciso o staging.
+
+## 8. Marco 2 — segurança, cadastros e Pontos Fixos
+
+Aplicação e validação no staging: **`docs/STAGING.md`**.
+
+### Migrations novas
+| Arquivo | Conteúdo |
+|---|---|
+| `20261008000000_permissao_operacao_todos.sql` | permissão `operacao.todos` (gestor vê todas as operações da empresa) |
+| `20261008000100_seguranca_escopo_links.sql` | Super Admin só por concessão explícita (com auditoria); `operation_members` (responsável/coordenador/líder por evento ou ponto fixo); RLS com escopo em operações, eventos, equipes, participantes, presença, pontos fixos, competências, itens, contas a pagar, pessoas e fotos; tokens de 64 hex + `rotate_link`; `public_link_attempts` com limite por IP/CPF e respostas genéricas |
+| `20261008000200_cadastros_multidia_pontos_fixos.sql` | `clientes_evento`, `centros_custo` (origem interno/conta_azul/importacao), `fornecedores`; PIX só mascarado no SELECT (`has_pix`, `pix_key_masked`; integral só via `person_pix`/`fornecedor_pix` com permissão financeira); eventos com `end_date`, presença por **dia** (`work_date`) sem nova inscrição; fechamento conta dias com check-in; fluxo de Ponto Fixo (criar, alocar, abrir/validar/reabrir/enviar competência) |
+| `20261008000300_endurecimento_privilegios.sql` | `anon` sem privilégio em tabelas, lista explícita de funções executáveis, sem TRUNCATE/TRIGGER/REFERENCES para `authenticated`, privilégios padrão revogados |
+
+### Regras de acesso
+- **Coordenador** (`operacao.gerenciar` sem `operacao.todos`): só operações em que está em `operation_members` —
+  lista, abrir por ID, equipes, profissionais, presença, fotos, fechamento e contas a pagar dessas operações. Quem cria
+  um evento/ponto fixo vira responsável automaticamente.
+- **Gestor** (`operacao.todos`) e `empresa.admin`: todas as operações da empresa; definem os responsáveis.
+- **Financeiro**: `financeiro.gerenciar` vê todas as contas da empresa; `financeiro.ver` só das operações do seu escopo.
+- **Cadastros** (clientes, centros de custo, fornecedores): escrita para gestor/admin/financeiro; leitura para quem opera.
+
+### Telas
+Pontos Fixos (lista em cards, novo, página com Resumo · Profissionais · Competências · Financeiro · Documentos ·
+Histórico), Pessoas/Freelancers (lista com CPF parcialmente oculto + perfil com Dados · Eventos · Pontos Fixos ·
+Presença · Financeiro · Documentos), Fornecedores, Clientes, Centros de Custo; responsáveis no resumo do evento;
+"Novo link" (revogação) nas equipes e na presença; seletor de dia na presença de eventos de vários dias.
+
+### Testes
+| Teste | Comando | Resultado |
+|---|---|---|
+| SQL (migrations do zero + isolamento + Marco 1 + Marco 2 + checagens) | `PGHOST=… PGPORT=… PGUSER=… supabase/tests/local/run.sh` | 28/28 · 45/45 · 66/66 · 11/11 |
+| E2E Marco 1 | `tests/e2e/stack.sh` → `node tests/e2e/marco1.e2e.mjs` | 19/19 |
+| E2E Marco 2 (Obra X, 5 profissionais, Out/2026 → 5 contas a pagar) | `tests/e2e/reset-db.sh` → `node tests/e2e/marco2.e2e.mjs` | 11/11 |
+| Staging (Auth + Storage reais) | `node tests/staging/validar-staging.mjs` | ensaiado localmente 16/16 sem Storage; **pendente no staging** |

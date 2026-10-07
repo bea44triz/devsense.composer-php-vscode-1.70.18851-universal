@@ -25,8 +25,8 @@ const browser = await chromium.launch({
   executablePath: process.env.CHROMIUM ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
   args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'],
 })
-const desktop = { viewport: { width: 1280, height: 860 }, permissions: ['geolocation', 'camera'], geolocation: VENUE, locale: 'pt-BR' }
-const mobile = { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, permissions: ['geolocation', 'camera'], geolocation: VENUE, locale: 'pt-BR' }
+const desktop = { viewport: { width: 1280, height: 860 }, permissions: ['geolocation', 'camera'], geolocation: VENUE, locale: 'pt-BR', timezoneId: 'America/Sao_Paulo' }
+const mobile = { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, permissions: ['geolocation', 'camera'], geolocation: VENUE, locale: 'pt-BR', timezoneId: 'America/Sao_Paulo' }
 
 async function login(ctx, email) {
   const page = await ctx.newPage()
@@ -40,7 +40,8 @@ async function login(ctx, email) {
 }
 
 let eventId = ''
-const today = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10)
+// o banco e o navegador usam o dia de São Paulo
+const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date())
 
 try {
   // ── 1. Líder da 061 cria o evento ─────────────────────────────────────────
@@ -54,8 +55,8 @@ try {
     await lp.getByRole('link', { name: 'Novo evento' }).first().click()
     await lp.getByLabel('Código *').fill('EV-E2E')
     await lp.getByLabel('Nome do evento *').fill('Congresso XPTO')
-    await lp.getByLabel('Cliente').fill('Cliente Exemplo')
-    await lp.getByLabel('Centro de custo').fill('CC-061-01')
+    await lp.getByRole('combobox', { name: 'Cliente' }).selectOption({ label: 'Cliente Exemplo' })
+    await lp.getByRole('combobox', { name: 'Centro de custo' }).selectOption({ label: 'CC-061-01 — Eventos' })
     await lp.getByLabel('Data *').fill(today)
     await lp.getByLabel('Início').fill('08:00')
     await lp.getByLabel('Fim').fill('18:00')
@@ -189,7 +190,7 @@ try {
     await page.goto(`${APP}/p/${tokIn}`)
     await page.getByLabel('Seu CPF').fill('045.821.736-08')
     await page.getByRole('button', { name: 'Localizar participação' }).click()
-    await page.getByText('ainda não foi confirmada').waitFor()
+    await page.getByText('Não foi possível localizar uma participação confirmada').waitFor()
     await page.close()
   })
   await step('4.4 check-out da Ana', async () => {
@@ -232,7 +233,7 @@ try {
     await lp.getByText('Fechamento enviado ao financeiro').waitFor()
     assert.equal(sql(`select count(*) from payables where operation_id='${eventId}'`), '2')
     assert.equal(sql(`select payee_name||'|'||payee_document||'|'||pix_type||'|'||pix_key||'|'||amount||'|'||op_code||'|'||op_name||'|'||ref_date||'|'||cost_center||'|'||status from payables where payee_name='Ana Teste'`),
-      `Ana Teste|03951728450|cpf|03951728450|200.00|EV-E2E|Congresso XPTO|${today}|CC-061-01|a_pagar`)
+      `Ana Teste|03951728450|cpf|03951728450|200.00|EV-E2E|Congresso XPTO|${today}|CC-061-01 — Eventos|a_pagar`)
   })
   await step('5.4 Contas a Pagar mostra os dados sem redigitação', async () => {
     await lp.goto(`${APP}/financeiro/contas-a-pagar`)

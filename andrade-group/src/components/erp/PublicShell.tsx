@@ -1,10 +1,10 @@
 import type { ReactNode } from 'react'
 import { CalendarDays, Clock, MapPin } from 'lucide-react'
-import { dateParts, fmtDate, fmtTime } from '@/lib/erp/ops'
+import { dateParts, fmtDateRange, fmtTime } from '@/lib/erp/ops'
 
 /** Moldura das páginas públicas (inscrição e presença) no visual do app Andrade. */
-export function PublicShell({ company, badge, title, date, start, end, location, address, children }: {
-  company?: string; badge?: string; title?: string; date?: string; start?: string | null; end?: string | null
+export function PublicShell({ company, badge, title, date, endDate, start, end, location, address, children }: {
+  company?: string; badge?: string; title?: string; date?: string; endDate?: string | null; start?: string | null; end?: string | null
   location?: string | null; address?: string | null; children: ReactNode
 }) {
   const dp = date ? dateParts(date) : null
@@ -30,7 +30,7 @@ export function PublicShell({ company, badge, title, date, start, end, location,
               <div className="min-w-0">
                 <h1 className="text-xl font-black leading-tight">{title}</h1>
                 <div className="mt-1.5 space-y-0.5 text-sm text-slate-300">
-                  {date && <div className="flex items-center gap-1.5"><CalendarDays className="h-3.5 w-3.5" />{fmtDate(date)}{(start || end) && <><Clock className="ml-2 h-3.5 w-3.5" />{fmtTime(start)}{end && ` às ${fmtTime(end)}`}</>}</div>}
+                  {date && <div className="flex items-center gap-1.5"><CalendarDays className="h-3.5 w-3.5" />{fmtDateRange(date, endDate)}{(start || end) && <><Clock className="ml-2 h-3.5 w-3.5" />{fmtTime(start)}{end && ` às ${fmtTime(end)}`}</>}</div>}
                   {location && <div className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-amber-400" />{location}</div>}
                   {address && <div className="pl-5 text-xs text-slate-400">{address}</div>}
                 </div>

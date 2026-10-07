@@ -1,16 +1,27 @@
 'use client'
 import { useState } from 'react'
-import { Camera, CheckCircle2, LogIn, LogOut, MapPin } from 'lucide-react'
+import { Camera, CheckCircle2, LogIn, LogOut, MapPin, RefreshCw } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { presencePhotoUrl, teamStats, type AttRow, type EventRow } from '@/lib/erp/ops-data'
-import { EmptyState, LinkActions, Modal } from '../ui'
+import { presencePhotoUrl, rotateLink, teamStats, type AttRow, type EventRow } from '@/lib/erp/ops-data'
+import { eventDays, todayISO } from '@/lib/erp/ops'
+import { EmptyState, ErrorBox, LinkActions, Modal } from '../ui'
 
 const hhmm = (iso: string) => new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 
 /** Painel do coordenador: em poucos segundos, quem chegou, quem falta e onde há vagas. */
-export function PresenceTab({ e }: { e: EventRow }) {
+export function PresenceTab({ e, canOperate, onChanged }: { e: EventRow; canOperate?: boolean; onChanged?: () => void }) {
   const origin = typeof window !== 'undefined' ? window.location.origin : ''
   const [photo, setPhoto] = useState<{ url: string; name: string } | null>(null)
+  const days = eventDays(e.event_date, e.end_date)
+  const today = todayISO()
+  const [day, setDay] = useState(days.includes(today) ? today : days[0] ?? e.event_date)
+  const [err, setErr] = useState<string | null>(null)
+  const multi = days.length > 1
+  const rotate = async (kind: 'checkin' | 'checkout') => {
+    if (!confirm('Gerar um link novo? O link atual deixa de funcionar imediatamente.')) return
+    setErr(null)
+    try { await rotateLink(kind, e.id); onChanged?.() } catch (x) { setErr((x as Error).message) }
+  }
   const teamName = (id: string) => e.event_teams.find((t) => t.id === id)?.name ?? ''
   const confirmed = e.event_participants.filter((p) => p.status === 'confirmado')
 
@@ -22,8 +33,18 @@ export function PresenceTab({ e }: { e: EventRow }) {
 
   return (
     <div className="space-y-5">
+      {err && <ErrorBox>{err}</ErrorBox>}
+      {multi && (
+        <div className="flex gap-1.5 overflow-x-auto">
+          {days.map((d) => (
+            <button key={d} onClick={() => setDay(d)} className={`whitespace-nowrap rounded-2xl border px-3 py-2 text-sm font-bold ${d === day ? 'border-amber-400 bg-amber-50 text-amber-800' : 'border-slate-200 bg-white text-slate-500'}`}>
+              {d.slice(8, 10)}/{d.slice(5, 7)}{d === today && ' · hoje'}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="grid gap-3 md:grid-cols-2">
-        {teamStats(e).map(({ team, needed, confirmed: conf, present, arrivedMissing, open }) => {
+        {teamStats(e, day).map(({ team, needed, confirmed: conf, present, arrivedMissing, open }) => {
           const complete = open === 0 && arrivedMissing === 0 && present === needed
           return (
             <div key={team.id} className={cn('rounded-3xl border bg-white p-4 shadow-sm', complete ? 'border-emerald-200' : 'border-slate-100')}>
@@ -45,16 +66,18 @@ export function PresenceTab({ e }: { e: EventRow }) {
 
       <div className="grid gap-3 rounded-3xl border border-slate-100 bg-white p-4 shadow-sm sm:grid-cols-2">
         <div><div className="mb-1.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-400"><LogIn className="h-3.5 w-3.5" />Link de check-in</div>
-          <LinkActions url={`${origin}/p/${e.checkin_token}`} title={`Check-in · ${e.name}`} /></div>
+          <LinkActions url={`${origin}/p/${e.checkin_token}`} title={`Check-in · ${e.name}`} />
+          {canOperate && <button onClick={() => rotate('checkin')} className="mt-1.5 inline-flex items-center gap-1 text-xs font-semibold text-slate-400 hover:text-amber-600"><RefreshCw className="h-3 w-3" />Gerar novo link</button>}</div>
         <div><div className="mb-1.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-400"><LogOut className="h-3.5 w-3.5" />Link de check-out</div>
-          <LinkActions url={`${origin}/p/${e.checkout_token}`} title={`Check-out · ${e.name}`} /></div>
+          <LinkActions url={`${origin}/p/${e.checkout_token}`} title={`Check-out · ${e.name}`} />
+          {canOperate && <button onClick={() => rotate('checkout')} className="mt-1.5 inline-flex items-center gap-1 text-xs font-semibold text-slate-400 hover:text-amber-600"><RefreshCw className="h-3 w-3" />Gerar novo link</button>}</div>
       </div>
 
       {confirmed.length === 0 ? <EmptyState title="Nenhum profissional confirmado" /> : (
         <ul className="divide-y divide-slate-100 overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm">
           {confirmed.map((p) => {
-            const cin = p.attendance.find((a) => a.kind === 'checkin')
-            const cout = p.attendance.find((a) => a.kind === 'checkout')
+            const cin = p.attendance.find((a) => a.kind === 'checkin' && a.work_date === day)
+            const cout = p.attendance.find((a) => a.kind === 'checkout' && a.work_date === day)
             const name = p.people?.full_name ?? ''
             return (
               <li key={p.id} className="flex flex-wrap items-center gap-3 px-4 py-3">

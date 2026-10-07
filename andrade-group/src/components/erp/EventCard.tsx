@@ -2,14 +2,17 @@
 import Link from 'next/link'
 import { Clock, MapPin, User } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { displayEventStatus, fmtTime, pct, statusTone, todayISO } from '@/lib/erp/ops'
+import { displayEventStatus, fmtDateRange, fmtTime, pct, statusTone, todayISO } from '@/lib/erp/ops'
 import { eventStats, teamCounts, type EventRow } from '@/lib/erp/ops-data'
 import { DateBlock, Pill, Progress } from './ui'
 
 /** Card grande de evento: data e local em destaque, ocupação da equipe e presença. */
 export function EventCard({ e, companyName, featured }: { e: EventRow; companyName?: string; featured?: boolean }) {
-  const st = eventStats(e)
-  const ds = displayEventStatus(e.status, e.event_date, teamCounts(e), todayISO())
+  const today = todayISO()
+  const multi = !!e.end_date && e.end_date > e.event_date
+  // em evento de vários dias, "presentes" é do dia de hoje
+  const st = eventStats(e, multi && e.event_date <= today && e.end_date! >= today ? today : undefined)
+  const ds = displayEventStatus(e.status, e.event_date, teamCounts(e), today, e.end_date)
   const fill = pct(st.confirmed, st.needed)
   return (
     <Link href={`/eventos/${e.id}`}
@@ -28,6 +31,7 @@ export function EventCard({ e, companyName, featured }: { e: EventRow; companyNa
           <div className={cn('mt-2 space-y-1 text-xs', featured ? 'text-slate-300' : 'text-slate-500')}>
             {e.location && <div className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 shrink-0 text-amber-500" /><span className="truncate">{e.location}</span></div>}
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              {multi && <span className="font-bold text-amber-600">{fmtDateRange(e.event_date, e.end_date)}</span>}
               {(e.start_time || e.end_time) && <span className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" />{fmtTime(e.start_time)}{e.end_time && `–${fmtTime(e.end_time)}`}</span>}
               {e.manager_name && <span className="flex items-center gap-1.5"><User className="h-3.5 w-3.5" />{e.manager_name}</span>}
             </div>

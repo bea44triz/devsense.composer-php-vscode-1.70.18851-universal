@@ -109,15 +109,16 @@ function Fechamento({ e, canOperate, reload }: { e: EventRow; canOperate: boolea
         {confirmed.map((p) => {
           const d = drafts[p.id] ?? toDraft(p)
           const cin = p.attendance.find((a) => a.kind === 'checkin')
-          const cout = p.attendance.find((a) => a.kind === 'checkout')
+          const cout = [...p.attendance].reverse().find((a) => a.kind === 'checkout')
+          const diasPresenca = new Set(p.attendance.filter((a) => a.kind === 'checkin').map((a) => a.work_date)).size
           const f = finalOf(p)
           return (
             <div key={p.id} className={cn('rounded-3xl border bg-white p-4 shadow-sm', d.worked === null ? 'border-amber-200' : 'border-slate-100')}>
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
                   <div className="font-black text-slate-800">{p.people?.full_name}</div>
-                  <div className="text-xs text-slate-400">{teamName(p.team_id)} · entrada {hhmm(cin?.recorded_at)} · saída {hhmm(cout?.recorded_at)}{cin?.inside_radius === false && ' · check-in fora do raio'}</div>
-                  {!p.people?.pix_key && <Pill tone="danger" className="mt-1">Sem chave PIX</Pill>}
+                  <div className="text-xs text-slate-400">{teamName(p.team_id)} · {diasPresenca > 1 ? `${diasPresenca} dias com check-in` : `entrada ${hhmm(cin?.recorded_at)} · saída ${hhmm(cout?.recorded_at)}`}{p.attendance.some((a) => a.inside_radius === false) && ' · registro fora do raio'}</div>
+                  {!p.people?.has_pix && <Pill tone="danger" className="mt-1">Sem chave PIX</Pill>}
                   {p.people?.pix_updated_publicly_at && <Pill tone="warning" className="mt-1">PIX alterado pelo link — conferir</Pill>}
                 </div>
                 <div className="text-right">

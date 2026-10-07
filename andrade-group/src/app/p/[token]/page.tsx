@@ -10,10 +10,11 @@ import { haversineMeters } from '@/lib/erp/ops'
 import { PublicCard, PublicShell } from '@/components/erp/PublicShell'
 
 interface Info {
-  kind: 'checkin' | 'checkout'; event_name: string; company_name: string; event_date: string; start_time: string | null; end_time: string | null
+  kind: 'checkin' | 'checkout'; event_name: string; company_name: string; event_date: string; end_date: string; today: string; start_time: string | null; end_time: string | null
   location: string | null; address: string | null; event_lat: number | null; event_lng: number | null; radius_m: number; open: boolean
 }
-interface Lookup { found: boolean; name?: string; team?: string; status?: string; checkin_at?: string | null; checkout_at?: string | null }
+// nome vem mascarado pelo banco ("Ana T."); "não encontrado" e "não confirmado" têm a mesma resposta
+interface Lookup { found?: boolean; blocked?: boolean; name?: string; team?: string; checkin_today?: boolean; open_shift?: string | null }
 interface Geo { lat: number; lng: number; accuracy: number }
 type Step = 'cpf' | 'confirm-person' | 'photo' | 'geo' | 'confirm' | 'done'
 
@@ -53,11 +54,10 @@ function Presenca({ token, info }: { token: string; info: Info }) {
     setBusy(false)
     if (error) return setErr(error.message)
     const l = data as unknown as Lookup
-    if (!l.found) return setErr('Não encontramos sua participação neste evento.')
-    if (l.status !== 'confirmado') return setErr('Sua participação ainda não foi confirmada pelo coordenador.')
-    if (isIn && l.checkin_at) return setErr('Seu check-in já foi registrado.')
-    if (!isIn && !l.checkin_at) return setErr('Faça o check-in antes do check-out.')
-    if (!isIn && l.checkout_at) return setErr('Seu check-out já foi registrado.')
+    if (l.blocked) return setErr('Muitas tentativas a partir desta conexão. Aguarde alguns minutos e tente novamente.')
+    if (!l.found) return setErr('Não foi possível localizar uma participação confirmada para este CPF neste evento. Confira o CPF ou fale com o coordenador.')
+    if (isIn && l.checkin_today) return setErr('Seu check-in de hoje já foi registrado.')
+    if (!isIn && !l.open_shift) return setErr('Não há check-in em aberto para registrar a saída.')
     setPerson(l)
     setStep('confirm-person')
   }
@@ -91,7 +91,7 @@ function Presenca({ token, info }: { token: string; info: Info }) {
   const dist = geo && info.event_lat != null && info.event_lng != null ? haversineMeters(geo.lat, geo.lng, info.event_lat, info.event_lng) : null
 
   return (
-    <PublicShell company={info.company_name} badge={label} title={info.event_name} date={info.event_date} start={info.start_time} end={info.end_time} location={info.location} address={info.address}>
+    <PublicShell company={info.company_name} badge={label} title={info.event_name} date={info.event_date} endDate={info.end_date} start={info.start_time} end={info.end_time} location={info.location} address={info.address}>
       <PublicCard>
         {!info.open && step !== 'done' ? (
           <p className="py-4 text-center text-sm text-slate-500">Registro de presença encerrado para este evento.</p>

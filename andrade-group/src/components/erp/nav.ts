@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, CalendarDays, Briefcase, Contact, Truck, Wallet, Banknote, FileBarChart, FolderOpen,
-  Building2, Users, Target, Tags, Landmark, ShieldCheck, History, type LucideIcon,
+  Building2, Users, Target, Tags, Landmark, ShieldCheck, History, Handshake, type LucideIcon,
 } from 'lucide-react'
 
 export interface NavItem { label: string; icon: LucideIcon; href: string; soon?: boolean }
@@ -11,9 +11,9 @@ export const NAV: NavSection[] = [
   { title: 'Início', emphasis: 'primary', items: [{ label: 'Dashboard', icon: LayoutDashboard, href: '/' }] },
   { title: 'Operação', emphasis: 'primary', items: [
     { label: 'Eventos', icon: CalendarDays, href: '/eventos' },
-    { label: 'Pontos Fixos', icon: Briefcase, href: '/em-breve/pontos-fixos', soon: true },
-    { label: 'Pessoas / Freelancers', icon: Contact, href: '/em-breve/pessoas', soon: true },
-    { label: 'Fornecedores', icon: Truck, href: '/em-breve/fornecedores', soon: true },
+    { label: 'Pontos Fixos', icon: Briefcase, href: '/pontos-fixos' },
+    { label: 'Pessoas / Freelancers', icon: Contact, href: '/pessoas' },
+    { label: 'Fornecedores', icon: Truck, href: '/fornecedores' },
   ] },
   { title: 'Financeiro', emphasis: 'secondary', items: [
     { label: 'Contas a Pagar', icon: Wallet, href: '/financeiro/contas-a-pagar' },
@@ -26,7 +26,8 @@ export const NAV: NavSection[] = [
   { title: 'Administração', emphasis: 'tertiary', items: [
     { label: 'Empresas', icon: Building2, href: '/em-breve/empresas', soon: true },
     { label: 'Usuários e Permissões', icon: Users, href: '/em-breve/usuarios', soon: true },
-    { label: 'Centros de Custo', icon: Target, href: '/em-breve/centros-de-custo', soon: true },
+    { label: 'Clientes', icon: Handshake, href: '/cadastros/clientes' },
+    { label: 'Centros de Custo', icon: Target, href: '/cadastros/centros-de-custo' },
     { label: 'Categorias', icon: Tags, href: '/em-breve/categorias', soon: true },
     { label: 'Contas Bancárias', icon: Landmark, href: '/em-breve/contas-bancarias', soon: true },
     { label: 'Auditoria', icon: ShieldCheck, href: '/em-breve/auditoria', soon: true },

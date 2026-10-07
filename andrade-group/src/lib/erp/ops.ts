@@ -22,24 +22,44 @@ export const TEAM_SUGGESTIONS = [
 
 export interface TeamCounts { quantity: number; confirmed: number }
 
-/** Status exibido do evento combinando status gravado, data e preenchimento das equipes. */
+/** Status exibido do evento combinando status gravado, datas (início/fim) e preenchimento das equipes. */
 export function displayEventStatus(
   status: EventStatus,
   eventDate: string,
   teams: TeamCounts[],
   today: string = todayISO(),
+  endDate?: string | null,
 ): DisplayEventStatus {
+  const last = endDate && endDate > eventDate ? endDate : eventDate;
   if (status === "cancelado") return "Cancelado";
   if (status === "fechado") return "Fechado";
   if (status === "aguardando_fechamento") return "Em fechamento";
-  if (status === "em_andamento") return eventDate < today ? "Encerrado" : "Em andamento";
-  if (eventDate < today) return "Encerrado";
+  if (status === "em_andamento") return last < today ? "Encerrado" : "Em andamento";
+  if (last < today) return "Encerrado";
   if (status === "planejamento") return "Planejamento";
   if (teams.length === 0) return "Planejamento";
   const complete = teams.every((t) => t.confirmed >= t.quantity);
   if (complete) return "Pronto";
-  if (eventDate === today) return "Equipe incompleta";
+  if (eventDate <= today) return "Equipe incompleta";
   return "Inscrições abertas";
+}
+
+/** "15/10" ou "15/10 a 17/10" */
+export function fmtDateRange(start: string, end?: string | null): string {
+  const d = (x: string) => `${x.slice(8, 10)}/${x.slice(5, 7)}`;
+  return end && end > start ? `${d(start)} a ${d(end)}` : fmtDate(start);
+}
+
+/** Dias do evento (YYYY-MM-DD), do início ao fim. */
+export function eventDays(start: string, end?: string | null): string[] {
+  const out: string[] = [];
+  const last = end && end > start ? end : start;
+  const cur = new Date(`${start}T12:00:00Z`);
+  while (cur.toISOString().slice(0, 10) <= last && out.length < 62) {
+    out.push(cur.toISOString().slice(0, 10));
+    cur.setUTCDate(cur.getUTCDate() + 1);
+  }
+  return out;
 }
 
 export function statusTone(s: DisplayEventStatus): "muted" | "info" | "warning" | "success" | "danger" {
@@ -86,6 +106,12 @@ export function fmtCompetence(d: string): string {
 export function maskCpf(cpf: string): string {
   const d = cpf.replace(/\D/g, "");
   return d.length === 11 ? `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}` : cpf;
+}
+
+/** CPF para listagens: só os 6 dígitos do meio (padrão LGPD de exibição). */
+export function cpfHidden(cpf: string): string {
+  const d = cpf.replace(/\D/g, "");
+  return d.length === 11 ? `***.${d.slice(3, 6)}.${d.slice(6, 9)}-**` : "***";
 }
 
 export function haversineMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {

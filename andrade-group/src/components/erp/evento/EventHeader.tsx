@@ -1,17 +1,19 @@
 'use client'
 import Link from 'next/link'
 import { ArrowLeft, Clock, MapPin } from 'lucide-react'
-import { brl, displayEventStatus, fmtTime, statusTone, todayISO } from '@/lib/erp/ops'
+import { brl, displayEventStatus, fmtDateRange, fmtTime, statusTone, todayISO } from '@/lib/erp/ops'
 import { eventStats, teamCounts, type EventRow } from '@/lib/erp/ops-data'
 import { DateBlock, Pill } from '../ui'
 
 export function EventHeader({ e, companyName }: { e: EventRow; companyName?: string }) {
-  const st = eventStats(e)
-  const ds = displayEventStatus(e.status, e.event_date, teamCounts(e), todayISO())
+  const today = todayISO()
+  const multi = !!e.end_date && e.end_date > e.event_date
+  const st = eventStats(e, multi && e.event_date <= today && e.end_date! >= today ? today : undefined)
+  const ds = displayEventStatus(e.status, e.event_date, teamCounts(e), today, e.end_date)
   const kpis: [string, string | number, string?][] = [
     ['Necessários', st.needed],
     ['Confirmados', st.confirmed],
-    ['Presentes', st.present],
+    [multi ? 'Presentes hoje' : 'Presentes', st.present],
     ['Vagas', st.open, st.open > 0 ? 'text-amber-400' : undefined],
     ['Previsto', brl(st.plannedCost)],
     ['Validado', brl(st.validatedCost)],
@@ -27,6 +29,7 @@ export function EventHeader({ e, companyName }: { e: EventRow; companyName?: str
           </div>
           <h1 className="mt-0.5 text-2xl font-black leading-tight">{e.name}</h1>
           <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-300">
+            {multi && <span className="font-bold text-amber-300">{fmtDateRange(e.event_date, e.end_date)}</span>}
             {e.location && <span className="flex items-center gap-1.5"><MapPin className="h-4 w-4 text-amber-400" />{e.location}</span>}
             {(e.start_time || e.end_time) && <span className="flex items-center gap-1.5"><Clock className="h-4 w-4" />{fmtTime(e.start_time)}{e.end_time && ` às ${fmtTime(e.end_time)}`}</span>}
           </div>

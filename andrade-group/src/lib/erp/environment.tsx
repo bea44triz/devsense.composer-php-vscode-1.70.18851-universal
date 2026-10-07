@@ -169,5 +169,11 @@ export function useScope() {
     companyId: currentCompany?.company_id ?? null,
     canOperate: writable && has('operacao.gerenciar'),
     canFinance: writable && has('financeiro.gerenciar'),
+    /** vê/gere todas as operações da empresa (sem isso, só as vinculadas a ele) */
+    canSeeAll: writable && has('operacao.todos'),
+    /** cadastra clientes, centros de custo e fornecedores (mesma regra do banco: can_manage_registry) */
+    canRegistry: writable && ((has('operacao.gerenciar') && has('operacao.todos')) || has('financeiro.gerenciar')),
+    /** dados financeiros completos (PIX inteiro) */
+    canSeeFinanceData: has('financeiro.ver') || has('financeiro.gerenciar'),
   }
 }

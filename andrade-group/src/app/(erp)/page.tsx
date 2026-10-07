@@ -1,10 +1,12 @@
 'use client'
 import Link from 'next/link'
-import { AlertTriangle, Briefcase, CalendarPlus, ChevronRight, ClipboardCheck, LogIn, LogOut, UserCheck, Users } from 'lucide-react'
+import { AlertTriangle, CalendarPlus, ChevronRight, ClipboardCheck, LogIn, LogOut, UserCheck, Users } from 'lucide-react'
 import { useEnvironment, useScope } from '@/lib/erp/environment'
 import { useLoad } from '@/lib/erp/use-load'
-import { brl, fmtCompetence, todayISO } from '@/lib/erp/ops'
-import { eventStats, fetchEvents, fetchFixedPosts, fetchPayables, type EventRow } from '@/lib/erp/ops-data'
+import { brl, todayISO } from '@/lib/erp/ops'
+import { eventStats, fetchEvents, fetchPayables, type EventRow } from '@/lib/erp/ops-data'
+import { fetchFixedPosts } from '@/lib/erp/fixed-data'
+import { FixedPostCard } from '@/components/erp/FixedPostCard'
 import { EventCard } from '@/components/erp/EventCard'
 import { EmptyState, ErrorBox, SectionTitle, Spinner } from '@/components/erp/ui'
 
@@ -22,11 +24,12 @@ export default function HomePage() {
   const today = todayISO()
   const all = events.data ?? []
   const active = all.filter((e) => e.status !== 'cancelado' && e.status !== 'fechado')
-  const todays = active.filter((e) => e.event_date === today && e.status !== 'aguardando_fechamento')
+  const last = (e: EventRow) => e.end_date ?? e.event_date
+  const todays = active.filter((e) => e.event_date <= today && last(e) >= today && e.status !== 'aguardando_fechamento')
   const upcoming = active.filter((e) => e.event_date > today).slice(0, 6)
-  const toClose = active.filter((e) => e.status === 'aguardando_fechamento' || e.event_date < today)
+  const toClose = active.filter((e) => e.status === 'aguardando_fechamento' || last(e) < today)
 
-  const pend = pendencias(todays, active.filter((e) => e.event_date >= today), toClose)
+  const pend = pendencias(todays, active.filter((e) => last(e) >= today), toClose, today)
   const openPay = (payables.data ?? []).filter((p) => OPEN_PAYABLE.includes(p.status))
   const name = (email ?? '').split('@')[0]
 
@@ -62,31 +65,12 @@ export default function HomePage() {
             </div>
           )}
 
-          <SectionTitle>Pontos Fixos</SectionTitle>
+          <SectionTitle action={<Link href="/pontos-fixos" className="flex items-center text-xs font-bold text-amber-600">Ver todos<ChevronRight className="h-4 w-4" /></Link>}>Pontos Fixos</SectionTitle>
           {posts.loading ? <Spinner /> : (posts.data ?? []).filter((p) => p.status === 'ativo').length === 0 ? (
-            <EmptyState title="Nenhum ponto fixo ativo" text="O módulo de Pontos Fixos chega no Marco 2." />
+            <EmptyState title="Nenhum ponto fixo ativo" />
           ) : (
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {(posts.data ?? []).filter((p) => p.status === 'ativo').map((p) => {
-                const ativos = p.fixed_post_members.filter((m) => m.status === 'ativo')
-                return (
-                  <div key={p.id} className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
-                    <div className="flex items-start gap-3">
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-900 text-amber-400"><Briefcase className="h-5 w-5" /></div>
-                      <div className="min-w-0">
-                        <div className="truncate font-black text-slate-800">{p.name}</div>
-                        <div className="truncate text-xs text-slate-500">{[p.category, p.client_name].filter(Boolean).join(' · ')}</div>
-                      </div>
-                    </div>
-                    <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
-                      <span><b className="text-slate-800">{ativos.length}</b> profissionais ativos</span>
-                      <span>{brl(ativos.reduce((acc, m) => acc + Number(m.monthly_rate), 0))}/mês</span>
-                      <span>Competência {fmtCompetence(today.slice(0, 8) + '01')}</span>
-                      {p.manager_name && <span>Resp. {p.manager_name}</span>}
-                    </div>
-                  </div>
-                )
-              })}
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {(posts.data ?? []).filter((p) => p.status === 'ativo').slice(0, 6).map((p) => <FixedPostCard key={p.id} p={p} companyName={s.consolidated ? s.companyName(p.company_id) : undefined} />)}
             </div>
           )}
 
@@ -115,8 +99,8 @@ export default function HomePage() {
   )
 }
 
-function pendencias(todays: EventRow[], upcomingAndToday: EventRow[], toClose: EventRow[]) {
-  const sum = (list: EventRow[], f: (st: ReturnType<typeof eventStats>) => number) => list.reduce((a, e) => a + f(eventStats(e)), 0)
+function pendencias(todays: EventRow[], upcomingAndToday: EventRow[], toClose: EventRow[], today: string) {
+  const sum = (list: EventRow[], f: (st: ReturnType<typeof eventStats>) => number) => list.reduce((a, e) => a + f(eventStats(e, today)), 0)
   return {
     vagas: sum(upcomingAndToday, (st) => st.open),
     aguardando: sum(upcomingAndToday, (st) => st.waiting),

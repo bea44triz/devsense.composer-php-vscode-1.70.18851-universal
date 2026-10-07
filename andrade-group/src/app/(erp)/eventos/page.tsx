@@ -5,7 +5,7 @@ import { CalendarPlus, LayoutGrid, List, Search } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useScope } from '@/lib/erp/environment'
 import { useLoad } from '@/lib/erp/use-load'
-import { displayEventStatus, fmtDate, fmtTime, statusTone, todayISO } from '@/lib/erp/ops'
+import { displayEventStatus, fmtDateRange, fmtTime, statusTone, todayISO } from '@/lib/erp/ops'
 import { eventStats, fetchEvents, teamCounts, type EventRow } from '@/lib/erp/ops-data'
 import { EventCard } from '@/components/erp/EventCard'
 import { EmptyState, ErrorBox, Pill, Spinner } from '@/components/erp/ui'
@@ -33,9 +33,10 @@ export default function EventosPage() {
       .filter((e) => !term || `${e.code} ${e.name} ${e.client_name ?? ''} ${e.location ?? ''}`.toLowerCase().includes(term))
       .filter((e) => {
         if (filtro === 'todos') return true
-        if (filtro === 'hoje') return e.event_date === today
-        if (filtro === 'fechamento') return e.status === 'aguardando_fechamento' || (e.event_date < today && e.status !== 'fechado' && e.status !== 'cancelado')
-        return e.event_date >= today && e.status !== 'fechado' && e.status !== 'cancelado'
+        const last = e.end_date ?? e.event_date
+        if (filtro === 'hoje') return e.event_date <= today && last >= today
+        if (filtro === 'fechamento') return e.status === 'aguardando_fechamento' || (last < today && e.status !== 'fechado' && e.status !== 'cancelado')
+        return last >= today && e.status !== 'fechado' && e.status !== 'cancelado'
       })
       .sort((a, b) => (filtro === 'todos' ? b.event_date.localeCompare(a.event_date) : a.event_date.localeCompare(b.event_date)))
   }, [events.data, q, filtro, today])
@@ -103,10 +104,10 @@ function ListaEventos({ list, today, companyName }: { list: EventRow[]; today: s
           <tbody className="divide-y divide-slate-100">
             {list.map((e) => {
               const st = eventStats(e)
-              const ds = displayEventStatus(e.status, e.event_date, teamCounts(e), today)
+              const ds = displayEventStatus(e.status, e.event_date, teamCounts(e), today, e.end_date)
               return (
                 <tr key={e.id} className="hover:bg-amber-50/40">
-                  <td className="whitespace-nowrap px-4 py-3 font-semibold text-slate-700">{fmtDate(e.event_date)} <span className="text-slate-400">{fmtTime(e.start_time)}</span></td>
+                  <td className="whitespace-nowrap px-4 py-3 font-semibold text-slate-700">{fmtDateRange(e.event_date, e.end_date)} <span className="text-slate-400">{fmtTime(e.start_time)}</span></td>
                   <td className="px-4 py-3">
                     <Link href={`/eventos/${e.id}`} className="font-bold text-slate-800 hover:text-amber-700">{e.name}</Link>
                     <div className="text-xs text-slate-400">{e.code}{companyName && ` · ${companyName(e.company_id)}`}{e.client_name && ` · ${e.client_name}`}</div>

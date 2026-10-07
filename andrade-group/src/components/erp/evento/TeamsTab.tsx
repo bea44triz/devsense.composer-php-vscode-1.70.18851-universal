@@ -1,9 +1,9 @@
 'use client'
 import { useState } from 'react'
-import { Clock, Lock, Pencil, Unlock, User, Users } from 'lucide-react'
+import { Clock, Lock, Pencil, RefreshCw, Unlock, User, Users } from 'lucide-react'
 import { getSupabase } from '@/lib/supabase/client'
 import { brl, fmtTime, pct } from '@/lib/erp/ops'
-import { setTeamRegistrations, teamStats, type EventRow, type TeamRow } from '@/lib/erp/ops-data'
+import { rotateLink, setTeamRegistrations, teamStats, type EventRow, type TeamRow } from '@/lib/erp/ops-data'
 import { ErrorBox, LinkActions, Modal, Pill, Progress } from '../ui'
 
 export function TeamsTab({ e, canOperate, onChanged, onViewTeam }: { e: EventRow; canOperate: boolean; onChanged: () => void; onViewTeam: (teamId: string) => void }) {
@@ -11,6 +11,12 @@ export function TeamsTab({ e, canOperate, onChanged, onViewTeam }: { e: EventRow
   const [editing, setEditing] = useState<TeamRow | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const closed = e.status === 'fechado' || e.status === 'cancelado' || e.status === 'aguardando_fechamento'
+
+  const rotate = async (t: TeamRow) => {
+    if (!confirm(`Gerar um link novo para ${t.name}? O link atual deixa de funcionar imediatamente.`)) return
+    setErr(null)
+    try { await rotateLink('inscricao', t.id); onChanged() } catch (x) { setErr((x as Error).message) }
+  }
 
   const toggle = async (t: TeamRow) => {
     setErr(null)
@@ -51,6 +57,7 @@ export function TeamsTab({ e, canOperate, onChanged, onViewTeam }: { e: EventRow
                 {canOperate && !closed && (
                   <>
                     <button onClick={() => setEditing(t)} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700"><Pencil className="h-3.5 w-3.5" />Editar</button>
+                    <button onClick={() => rotate(t)} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700"><RefreshCw className="h-3.5 w-3.5" />Novo link</button>
                     <button onClick={() => toggle(t)} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700">
                       {t.registrations_open ? <><Lock className="h-3.5 w-3.5" />Encerrar inscrições</> : <><Unlock className="h-3.5 w-3.5" />Reabrir inscrições</>}
                     </button>

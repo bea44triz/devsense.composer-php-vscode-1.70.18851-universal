@@ -160,7 +160,7 @@ function SideNav({ onNavigate }: { onNavigate?: () => void }) {
 const BOTTOM = [
   { href: '/', label: 'Início', Icon: LayoutDashboard },
   { href: '/eventos', label: 'Eventos', Icon: CalendarDays },
-  { href: '/em-breve/pontos-fixos', label: 'Pontos Fixos', Icon: Briefcase },
+  { href: '/pontos-fixos', label: 'Pontos Fixos', Icon: Briefcase },
   { href: '/financeiro/contas-a-pagar', label: 'Financeiro', Icon: Wallet },
 ]
 

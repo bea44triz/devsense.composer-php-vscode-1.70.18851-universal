@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getEventoById, getInscricoesByEvento } from '@/lib/google-sheets'
+import { getEventoById, getInscricoesByEvento, contarPreenchidas } from '@/lib/google-sheets'
+import { vagasDisponiveis } from '@/lib/utils'
 import { EquipeVaga } from '@/types'
 
 // Deprecated POST — kept to return a clear error instead of 404
@@ -43,8 +44,8 @@ export async function GET(req: NextRequest) {
 
     const total      = vagaAlvo.vagas
     const inscricoes = await getInscricoesByEvento(eventoId)
-    const preenchidas = inscricoes.filter(r => r[8] === equipe && r[9] === tipo).length
-    const disponivel  = Math.max(0, total - preenchidas)
+    const preenchidas = contarPreenchidas(inscricoes, equipe, tipo)
+    const disponivel  = vagasDisponiveis(total, preenchidas)  // Math.max(0, total - preenchidas)
     // preenchidas > total indicates a data inconsistency (race or manual edit)
     const inconsistente = preenchidas > total
 

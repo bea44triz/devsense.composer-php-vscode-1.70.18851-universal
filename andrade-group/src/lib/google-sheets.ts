@@ -1,4 +1,5 @@
 import { google } from 'googleapis'
+import { isInscricaoAtiva, onlyDigits } from '@/lib/utils'
 
 const SPREADSHEET_ID = process.env.GOOGLE_SHEETS_ID!
 
@@ -23,7 +24,10 @@ export async function sheetAppend(range: string, row: string[]) {
 }
 
 // Writes a row at an explicit row number (bypasses append table-detection).
-// RAW mode stores strings exactly as sent, preserving leading zeros in CPF, phone, etc.
+// valueInputOption RAW: o Sheets grava cada string exatamente como enviada, como TEXTO —
+// sem interpretar como número, data ou fórmula. "01234567890" continua "01234567890"
+// e nenhum caractere artificial (como apóstrofo) é inserido no conteúdo.
+// LIMITAÇÃO: ler A:A e depois gravar em nextRow não é atômico (ver MAPA_DO_PROJETO.md §9).
 async function sheetWriteRow(sheetName: string, lastCol: string, row: string[]) {
   const existing = await sheetGet(`${sheetName}!A:A`)
   const nextRow  = existing.length + 1
@@ -39,7 +43,11 @@ async function sheetWriteRow(sheetName: string, lastCol: string, row: string[]) 
 
 export async function sheetGet(range: string): Promise<string[][]> {
   const sheets = getSheetsClient()
-  const res = await sheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range })
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: SPREADSHEET_ID,
+    range,
+    valueRenderOption: 'FORMATTED_VALUE',  // sempre string; células RAW de texto voltam idênticas
+  })
   return (res.data.values ?? []) as string[][]
 }
 
@@ -94,24 +102,48 @@ export async function appendEvento(row: string[]) {
 
 // ── Inscrições ─────────────────────────────────────────────────────────────────
 // Aba: Inscricoes | A:id | B:eventoId | C:nome | D:cpf | E:telefone | F:email |
-//                  G:pixTipo | H:pixChave | I:equipe | J:tipo | K:criadoEm
+//                  G:pixTipo | H:pixChave | I:equipe | J:tipo | K:criadoEm | L:status
+// L:status — 'ativa' | 'confirmada' | 'cancelada'. Vazio (linhas antigas) = ativa.
+
+/**
+ * Remove o apóstrofo inicial que versões anteriores enviavam com USER_ENTERED.
+ * Nesse modo o Sheets não guarda o apóstrofo no valor, mas uma célula editada
+ * manualmente ou gravada em RAW com "'" o teria literalmente — a API nunca o devolve.
+ */
+function cleanText(v: string | undefined): string {
+  return String(v ?? '').replace(/^'/, '')
+}
+
+/** Normaliza CPF/telefone/pixChave de uma linha lida da aba Inscricoes. */
+function cleanInscricaoRow(r: string[]): string[] {
+  const out = [...r]
+  out[3] = cleanText(r[3])  // cpf
+  out[4] = cleanText(r[4])  // telefone
+  out[7] = cleanText(r[7])  // pixChave
+  return out
+}
 
 export async function getInscricoesByEvento(eventoId: string) {
-  const rows = await sheetGet('Inscricoes!A:K')
-  return rows.filter(r => r[1] === eventoId)
+  const rows = await sheetGet('Inscricoes!A:L')
+  return rows.filter(r => r[1] === eventoId).map(cleanInscricaoRow)
+}
+
+/** Inscrições que ocupam vaga (ativas/confirmadas) para uma equipe+tipo. */
+export function contarPreenchidas(inscricoes: string[][], equipe: string, tipo: string): number {
+  return inscricoes.filter(r => r[8] === equipe && r[9] === tipo && isInscricaoAtiva(r[11])).length
 }
 
 export async function getInscricaoByCpfEvento(cpf: string, eventoId: string) {
-  const rows = await sheetGet('Inscricoes!A:K')
-  // Normalise both sides to digits-only to handle formatting differences
-  const cpfDigits = cpf.replace(/\D/g, '')
-  return rows.find(r => (r[3]?.replace(/\D/g, '') ?? '') === cpfDigits && r[1] === eventoId) ?? null
+  // Compara somente dígitos, como string — nunca Number(), que perderia o zero à esquerda.
+  const cpfDigits = onlyDigits(cpf)
+  const rows = await getInscricoesByEvento(eventoId)
+  return rows.find(r => onlyDigits(r[3]) === cpfDigits && isInscricaoAtiva(r[11])) ?? null
 }
 
 export async function appendInscricao(row: string[]) {
-  // row: [id, eventoId, nome, cpf, telefone, email, pixTipo, pixChave, equipe, tipo, criadoEm]
-  // RAW mode in sheetWriteRow preserves leading zeros without any prefix.
-  return sheetWriteRow('Inscricoes', 'K', row)
+  // row: [id, eventoId, nome, cpf, telefone, email, pixTipo, pixChave, equipe, tipo, criadoEm, status]
+  // Todos os valores são strings; RAW em sheetWriteRow preserva zeros à esquerda sem prefixo.
+  return sheetWriteRow('Inscricoes', 'L', row)
 }
 
 // ── Check-in / Check-out ───────────────────────────────────────────────────────
@@ -120,7 +152,7 @@ export async function appendInscricao(row: string[]) {
 
 export async function appendCheckInOut(row: string[]) {
   // row: [id, eventoId, cpf, nome, equipe, tipo, tipoRegistro, localRegistro, lat, lon, accuracy, timestamp]
-  // RAW mode in sheetWriteRow preserves leading zeros without any prefix.
+  // CPF já chega normalizado (11 dígitos, string); RAW preserva zeros à esquerda sem prefixo.
   return sheetWriteRow('CheckInOut', 'L', row)
 }
 

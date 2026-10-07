@@ -11,7 +11,7 @@ import {
 } from 'lucide-react'
 import { TipoVaga } from '@/types'
 import { criarEvento } from '@/app/actions/eventos'
-import { makeSlug } from '@/lib/utils'
+import { makeSlug, normalizeLabel } from '@/lib/utils'
 
 interface NominatimResult {
   display_name: string
@@ -63,7 +63,7 @@ function gerarLinks(eventoId: string, vagas: VagasMap, equipes: EquipeItem[]) {
         links.push({
           equipe: e.key, tipo: t.key,
           label:  `${e.label} — ${t.label}`,
-          url:    `${base}/cadastro/${eventoId}?equipe=${encodeURIComponent(e.key)}&tipo=${encodeURIComponent(t.key)}`,
+          url:    `${base}/cadastro/${encodeURIComponent(eventoId)}?equipe=${encodeURIComponent(e.key)}&tipo=${encodeURIComponent(t.key)}`,
         })
       }
     })
@@ -104,7 +104,8 @@ export default function CadastrarEventosPage() {
   // ── Dynamic equipes ─────────────────────────────────────────────────────────
 
   const adicionarEquipe = () => {
-    const label = novaEquipe.trim()
+    // label: exibição (mantém acentos, ex. "Recepção"); key: slug único no evento ("recepcao")
+    const label = normalizeLabel(novaEquipe)
     if (!label) { setErroEquipe('Informe o nome da equipe.'); return }
     const key = makeSlug(label)
     if (!key) { setErroEquipe('Nome inválido.'); return }
@@ -225,8 +226,8 @@ export default function CadastrarEventosPage() {
   if (eventoId) {
     const regLinks    = gerarLinks(eventoId, vagas, equipeItems)
     const origin      = typeof window !== 'undefined' ? window.location.origin : ''
-    const checkinUrl  = `${origin}/checkin/${eventoId}`
-    const checkoutUrl = `${origin}/checkout/${eventoId}`
+    const checkinUrl  = `${origin}/checkin/${encodeURIComponent(eventoId)}`
+    const checkoutUrl = `${origin}/checkout/${encodeURIComponent(eventoId)}`
 
     return (
       <AppShell>

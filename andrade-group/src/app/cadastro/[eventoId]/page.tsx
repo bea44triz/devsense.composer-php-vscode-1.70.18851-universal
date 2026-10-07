@@ -63,17 +63,23 @@ export default function CadastroPage() {
   const [erro, setErro]         = useState<string | null>(null)
 
   useEffect(() => {
-    fetch(`/api/eventos/${eventoId}`)
+    fetch(`/api/eventos/${encodeURIComponent(eventoId)}`)
       .then(r => r.json())
       .then(d => { if (d.success) setEvento(d.data) })
       .finally(() => setLoading(false))
   }, [eventoId])
 
   useEffect(() => {
-    if (!eventoId || !equipe || !tipo) { setVagasLoading(false); return }
+    // Link sem equipe/tipo: tratado como Indisponível em `esgotado` (sem consulta)
+    if (!eventoId || !equipe || !tipo) return
+    const semVaga: VagasInfo = { total: 0, preenchidas: 0, disponivel: 0, inconsistente: false }
     fetch(`/api/vagas?eventoId=${encodeURIComponent(eventoId)}&equipe=${encodeURIComponent(equipe)}&tipo=${encodeURIComponent(tipo)}`)
-      .then(r => r.json())
-      .then(d => { if (d.success) setVagasInfo(d.data) })
+      .then(async r => {
+        const d = await r.json()
+        if (d.success) setVagasInfo(d.data)
+        else if (r.status === 404) setVagasInfo(semVaga)  // vaga inexistente no evento
+      })
+      .catch(() => { /* falha de rede: backend revalida no envio */ })
       .finally(() => setVagasLoading(false))
   }, [eventoId, equipe, tipo])
 
@@ -142,6 +148,13 @@ export default function CadastroPage() {
         }),
       })
       const data = await res.json()
+      // 409: o backend revalidou e a vaga acabou — passa para o estado Indisponível
+      if (res.status === 409) {
+        setVagasInfo(v => ({
+          total: v?.total ?? 0, preenchidas: v?.preenchidas ?? 0,
+          disponivel: 0, inconsistente: v?.inconsistente ?? false,
+        }))
+      }
       if (!res.ok) throw new Error(data.error ?? 'Erro ao cadastrar.')
       setSucesso(true)
     } catch (err) {
@@ -186,7 +199,8 @@ export default function CadastroPage() {
   }
 
   const dataEvento = new Intl.DateTimeFormat('pt-BR').format(new Date(evento.data + 'T12:00:00'))
-  const esgotado   = !vagasLoading && vagasInfo !== null && vagasInfo.disponivel === 0
+  const linkIncompleto = !equipe || !tipo
+  const esgotado   = linkIncompleto || (!vagasLoading && vagasInfo !== null && vagasInfo.disponivel <= 0)
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -213,6 +227,7 @@ export default function CadastroPage() {
               <div className="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center">
                 <Users className="w-7 h-7 text-red-500" />
               </div>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-600">Indisponível</span>
               <h3 className="font-black text-slate-800 text-lg">Vagas esgotadas</h3>
               <p className="text-sm text-slate-500">
                 Todas as vagas para esta equipe já foram preenchidas.
@@ -276,7 +291,7 @@ export default function CadastroPage() {
                 <p className="text-sm text-red-500 bg-red-50 border border-red-100 rounded-2xl px-4 py-3">{erro}</p>
               )}
 
-              <Button type="submit" size="lg" loading={submitting}>
+              <Button type="submit" size="lg" loading={submitting} disabled={vagasLoading || esgotado}>
                 Confirmar cadastro
               </Button>
 

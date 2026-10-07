@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { appendCheckInOut, getCheckInOutByEvento, getInscricaoByCpfEvento, getEventoById } from '@/lib/google-sheets'
-import { generateId } from '@/lib/utils'
+import { generateId, isValidCpf, onlyDigits } from '@/lib/utils'
 
 async function reverseGeocode(lat: number, lon: number): Promise<string> {
   try {
@@ -45,7 +45,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Evento não encontrado.' }, { status: 404 })
     }
 
-    const inscricao = await getInscricaoByCpfEvento(cpf, eventoId)
+    // CPF tratado sempre como string de 11 dígitos (preserva zero à esquerda)
+    const cpfNorm = onlyDigits(cpf)
+    if (!isValidCpf(cpfNorm)) {
+      return NextResponse.json({ success: false, error: 'CPF inválido.' }, { status: 422 })
+    }
+
+    const inscricao = await getInscricaoByCpfEvento(cpfNorm, eventoId)
     const nome   = inscricao ? inscricao[2] : ''
     const equipe = inscricao ? inscricao[8] : ''
     const tipo   = inscricao ? inscricao[9] : ''
@@ -55,7 +61,7 @@ export async function POST(req: NextRequest) {
     const id        = generateId()
     const timestamp = new Date().toISOString()
     const row = [
-      id, eventoId, cpf, nome, equipe, tipo, tipoRegistro,
+      id, eventoId, cpfNorm, nome, equipe, tipo, tipoRegistro,
       localRegistro, String(latitude), String(longitude), String(accuracy ?? ''), timestamp,
     ]
     await appendCheckInOut(row)
@@ -77,7 +83,7 @@ export async function GET(req: NextRequest) {
   try {
     const rows = await getCheckInOutByEvento(eventoId)
     const registros = rows.map(r => ({
-      id: r[0], eventoId: r[1], cpf: r[2], nome: r[3],
+      id: r[0], eventoId: r[1], cpf: onlyDigits(r[2]), nome: r[3],
       equipe: r[4], tipo: r[5], tipoRegistro: r[6],
       localRegistro: r[7] ?? '',
       latitude: Number(r[8]), longitude: Number(r[9]),

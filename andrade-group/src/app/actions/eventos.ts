@@ -1,7 +1,7 @@
 'use server'
 import { auth } from '@/auth'
 import { appendEvento, getEventoById } from '@/lib/google-sheets'
-import { generateId } from '@/lib/utils'
+import { generateId, makeSlug, normalizeLabel } from '@/lib/utils'
 import { EquipeVaga } from '@/types'
 
 export interface CriarEventoPayload {
@@ -27,7 +27,27 @@ export async function criarEvento(payload: CriarEventoPayload) {
 
   try {
     const { titulo, descricao, data, horaInicio, horaFim, local, endereco,
-            latitude, longitude, equipes } = payload
+            latitude, longitude } = payload
+
+    // Equipes: slug não vazio e único por tipo dentro do evento; label preservado para exibição
+    const vistos = new Set<string>()
+    const equipes: EquipeVaga[] = []
+    for (const e of payload.equipes ?? []) {
+      const label = normalizeLabel(e.label ?? e.equipe)
+      const slug  = makeSlug(e.equipe)
+      if (!label || !slug || slug !== e.equipe) {
+        return { success: false as const, error: `Nome de equipe inválido: "${e.label ?? e.equipe}".` }
+      }
+      const chave = `${slug}|${e.tipo}`
+      if (vistos.has(chave)) {
+        return { success: false as const, error: `Equipe duplicada: "${label}".` }
+      }
+      vistos.add(chave)
+      equipes.push({ ...e, equipe: slug, label })
+    }
+    if (equipes.length === 0) {
+      return { success: false as const, error: 'Informe ao menos uma equipe com vagas.' }
+    }
 
     const id  = generateId()
     const row = [

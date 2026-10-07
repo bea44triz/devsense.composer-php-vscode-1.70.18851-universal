@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { appendInscricao, getInscricoesByEvento, getEventoById } from '@/lib/google-sheets'
+import { appendInscricao, getInscricoesByEvento, getEventoById, contarPreenchidas } from '@/lib/google-sheets'
 import {
   generateId, onlyDigits,
   isValidCpf, isValidEmail, isValidPhone, isValidPixKey, hasFullName,
-  normalizePixKey,
+  normalizePixKey, isPixTipo, vagasDisponiveis,
 } from '@/lib/utils'
 import { EquipeVaga } from '@/types'
-
-const VALID_PIX_TIPOS = ['cpf', 'cnpj', 'celular', 'email', 'aleatoria'] as const
-type PixTipo = typeof VALID_PIX_TIPOS[number]
 
 export async function POST(req: NextRequest) {
   try {
@@ -20,7 +17,7 @@ export async function POST(req: NextRequest) {
     }
 
     // ── pixTipo enum check ──────────────────────────────────────────────────────
-    if (!VALID_PIX_TIPOS.includes(pixTipo as PixTipo)) {
+    if (!isPixTipo(pixTipo)) {
       return NextResponse.json(
         { success: false, error: `Tipo de chave PIX inválido: ${pixTipo}.` },
         { status: 422 }
@@ -56,11 +53,9 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Vacancy check ───────────────────────────────────────────────────────────
-    // NOTE: this is a read-then-write sequence, not atomic. Under concurrent requests,
-    // two users can both read "1 slot available" and both succeed — resulting in
-    // preenchidas > vagas. Mitigation (not yet implemented): use a dedicated "Locks"
-    // sheet where each attempt inserts a timestamped row, then proceeds only if its
-    // row is the earliest for that vacancy, and deletes it when done.
+    // LIMITAÇÃO: leitura seguida de escrita no Google Sheets, NÃO atômica. Duas requisições
+    // simultâneas podem ler "1 vaga" e ambas gravar (preenchidas > vagas). A última vaga
+    // não está protegida contra concorrência. Ver MAPA_DO_PROJETO.md §9.
     let equipes: EquipeVaga[] = []
     try { equipes = JSON.parse(eventoRow[10] ?? '[]') } catch { equipes = [] }
 
@@ -70,18 +65,20 @@ export async function POST(req: NextRequest) {
     }
 
     const inscritas   = await getInscricoesByEvento(eventoId)
-    const preenchidas = inscritas.filter(r => r[8] === equipe && r[9] === tipo).length
-    if (preenchidas >= vagaAlvo.vagas) {
+    const preenchidas = contarPreenchidas(inscritas, equipe, tipo)
+    if (vagasDisponiveis(vagaAlvo.vagas, preenchidas) === 0) {
       return NextResponse.json({ success: false, error: 'Esta vaga não está mais disponível.' }, { status: 409 })
     }
 
     // ── Persist ─────────────────────────────────────────────────────────────────
     const id          = generateId()
     const pixChaveNorm = normalizePixKey(pixChave, pixTipo)
+    // Todos os campos como string limpa — sem Number()/parseInt e sem prefixo.
     const row = [
-      id, eventoId, nome, cpfNorm, onlyDigits(telefone), email,
+      id, eventoId, String(nome).trim(), cpfNorm, onlyDigits(telefone), String(email).trim(),
       pixTipo, pixChaveNorm, equipe, tipo,
       new Date().toISOString(),
+      'ativa',
     ]
     await appendInscricao(row)
 
@@ -101,7 +98,7 @@ export async function GET(req: NextRequest) {
     const inscricoes = rows.map(r => ({
       id: r[0], eventoId: r[1], nome: r[2], cpf: r[3],
       telefone: r[4], email: r[5], pixTipo: r[6], pixChave: r[7],
-      equipe: r[8], tipo: r[9], criadoEm: r[10],
+      equipe: r[8], tipo: r[9], criadoEm: r[10], status: r[11] || 'ativa',
     }))
     return NextResponse.json({ success: true, data: inscricoes })
   } catch {

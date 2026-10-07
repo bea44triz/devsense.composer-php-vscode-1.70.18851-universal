@@ -1,6 +1,7 @@
 import { auth }                  from '@/auth'
 import { redirect }              from 'next/navigation'
-import { getEventoById, getInscricoesByEvento } from '@/lib/google-sheets'
+import { getEventoById, getInscricoesByEvento, contarPreenchidas } from '@/lib/google-sheets'
+import { vagasDisponiveis }      from '@/lib/utils'
 import { rowToEvento }           from '@/app/api/eventos/route'
 import { AppShell }              from '@/components/Layout/AppShell'
 import { PageHeader }            from '@/components/Layout/PageHeader'
@@ -39,7 +40,7 @@ export default async function EventoDetailPage({ params }: { params: Promise<{ i
 
   const regLinks = evento.equipes.filter(e => e.vagas > 0).map(e => ({
     label: `${equipeLabel(e.equipe, e.label)} — ${TIPO_LABELS[e.tipo] ?? e.tipo} (${e.vagas} vagas)`,
-    url:   `${baseUrl}/cadastro/${id}?equipe=${e.equipe}&tipo=${e.tipo}`,
+    url:   `${baseUrl}/cadastro/${encodeURIComponent(id)}?equipe=${encodeURIComponent(e.equipe)}&tipo=${encodeURIComponent(e.tipo)}`,
   }))
 
   return (
@@ -90,8 +91,8 @@ export default async function EventoDetailPage({ params }: { params: Promise<{ i
               O coordenador envia esses links no dia do evento
             </p>
             <div className="space-y-2">
-              <LinkCopy label="Check-in"  url={`${baseUrl}/checkin/${id}`}  />
-              <LinkCopy label="Check-out" url={`${baseUrl}/checkout/${id}`} />
+              <LinkCopy label="Check-in"  url={`${baseUrl}/checkin/${encodeURIComponent(id)}`}  />
+              <LinkCopy label="Check-out" url={`${baseUrl}/checkout/${encodeURIComponent(id)}`} />
             </div>
           </CardSection>
         </Card>
@@ -100,8 +101,8 @@ export default async function EventoDetailPage({ params }: { params: Promise<{ i
           <CardSection title="Equipes">
             <div className="space-y-2">
               {evento.equipes.filter(e => e.vagas > 0).map(e => {
-                const preenchido  = inscricoes.filter(r => r[8] === e.equipe && r[9] === e.tipo).length
-                const disponivel  = Math.max(0, e.vagas - preenchido)
+                const preenchido  = contarPreenchidas(inscricoes, e.equipe, e.tipo)
+                const disponivel  = vagasDisponiveis(e.vagas, preenchido)
                 const cheio       = disponivel === 0
                 const inconsistente = preenchido > e.vagas
 
@@ -150,8 +151,10 @@ export default async function EventoDetailPage({ params }: { params: Promise<{ i
             {/* Summary totals */}
             {evento.equipes.some(e => e.vagas > 0) && (() => {
               const total      = evento.equipes.reduce((s, e) => s + e.vagas, 0)
-              const preenchido = inscricoes.filter(r => evento.equipes.some(e => e.equipe === r[8] && e.tipo === r[9])).length
-              const disponivel = Math.max(0, total - preenchido)
+              const preenchido = evento.equipes.reduce((s, e) => s + contarPreenchidas(inscricoes, e.equipe, e.tipo), 0)
+              // Soma por equipe (cada uma limitada a zero) — excesso em uma equipe não "abre" vaga em outra
+              const disponivel = evento.equipes.reduce(
+                (s, e) => s + vagasDisponiveis(e.vagas, contarPreenchidas(inscricoes, e.equipe, e.tipo)), 0)
               return (
                 <div className="mt-3 pt-3 border-t border-slate-100 flex justify-between text-xs text-slate-500">
                   <span>Total: <strong className="text-slate-700">{total}</strong></span>

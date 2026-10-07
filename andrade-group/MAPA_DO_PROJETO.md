@@ -229,16 +229,40 @@ const totalVagas = e.equipes.reduce((s, eq) => s + eq.vagas, 0)
 
 ## 9. Função responsável por bloquear vagas preenchidas
 
-Atualmente **não há um mecanismo automático de bloqueio de vagas** por concorrência.
-O campo `vagasOcupadas` existe na interface `EquipeVaga` (em `src/types/index.ts`)
-e é inicializado como `0` na criação do evento, mas **não é incrementado automaticamente**
-quando um freelancer se inscreve.
+**Arquivos:** `src/app/api/inscricoes/route.ts` (POST), `src/app/api/vagas/route.ts` (GET),
+`src/lib/google-sheets.ts` (`contarPreenchidas`), `src/lib/utils.ts` (`vagasDisponiveis`, `isInscricaoAtiva`).
 
-Para bloquear vagas preenchidas seria necessário:
-1. No `POST /api/inscricoes`, ler o evento, verificar `vagasOcupadas < vagas` para a
-   equipe/tipo em questão, e incrementar `vagasOcupadas` na planilha.
+- Disponível = `Math.max(0, total - preenchidas)` — nunca negativo.
+- `preenchidas` conta só inscrições com status (coluna L da aba `Inscricoes`) vazio, `ativa`
+  ou `confirmada`. Um cancelamento futuro só precisa gravar `cancelada` nessa coluna.
+- Se `preenchidas > total`, a API retorna `inconsistente: true`; a tela mostra 0 disponível e um aviso.
+- A página pública consulta `/api/vagas` ao abrir; sem vaga mostra "Indisponível" e não exibe o
+  formulário. O POST revalida as vagas no backend (HTTP 409 quando cheio).
 
-Este é um ponto de melhoria identificado para a próxima versão.
+### Limitação atual — concorrência (NÃO resolvida)
+
+A verificação é **leitura seguida de escrita** no Google Sheets, sem transação:
+
+1. Duas inscrições simultâneas podem ler "1 vaga disponível" e ambas gravar → `preenchidas > total`.
+   **A última vaga não está protegida contra concorrência.**
+2. `sheetWriteRow` lê `A:A` para achar a próxima linha e grava nela. Duas gravações simultâneas
+   (em qualquer aba) podem calcular a mesma linha e **uma sobrescrever a outra**.
+
+A janela é curta (centenas de ms), mas existe.
+
+### Opção mais simples para bloqueio (proposta, não implementada)
+
+Usar a própria aba `Inscricoes` e a coluna `status` já existente — "grava primeiro, confere depois":
+
+1. Gravar a inscrição com `spreadsheets.values.append` (RAW, `INSERT_ROWS`): o Sheets insere cada
+   append numa linha nova de forma atômica, eliminando a sobrescrita do item 2.
+2. Reler a aba e listar, **na ordem das linhas**, as inscrições ativas daquela equipe+tipo.
+3. Se a posição da linha recém-gravada for `> total`, gravar `cancelada` (motivo: excedente) no
+   `status` dessa linha e responder 409. Como todos os concorrentes enxergam a mesma ordem de linhas,
+   no máximo `total` inscrições permanecem ativas.
+
+Alternativa mais robusta, fora da estrutura atual: um Apps Script publicado como Web App usando
+`LockService.getScriptLock()` para serializar leitura + escrita.
 
 ---
 
@@ -251,10 +275,11 @@ Rota: `POST /api/inscricoes`
 Recebe: `{ eventoId, nome, cpf, telefone, email, pixTipo, pixChave, equipe, tipo }`
 
 Fluxo:
-1. Valida campos obrigatórios
+1. Valida campos obrigatórios, `pixTipo` (enum) e formato de cada campo
 2. Confirma que o evento existe via `getEventoById()`
-3. Gera um `id` único via `generateId()`
-4. Chama `appendInscricao(row)` → escreve na aba `INSCRICOES` do Sheets
+3. Revalida vagas (ver §9)
+4. Gera um `id` único via `generateId()`
+5. Chama `appendInscricao(row)` → escreve na aba `Inscricoes` em modo RAW (strings, status `ativa`)
 
 A tela que aciona essa rota é: `src/app/cadastro/[eventoId]/page.tsx`
 
@@ -317,19 +342,25 @@ async function sheetWriteRow(sheetName: string, lastCol: string, row: string[]) 
   await sheets.spreadsheets.values.update({
     spreadsheetId: SPREADSHEET_ID,
     range: `${sheetName}!A${nextRow}:${lastCol}${nextRow}`,
-    valueInputOption: 'USER_ENTERED',
+    valueInputOption: 'RAW',
     requestBody: { values: [row] },
   })
   return nextRow
 }
 ```
 
+**Estratégia para CPF, telefone e chave PIX:** todos os valores são enviados como `string`
+(nunca `Number()`/`parseInt()`), com `valueInputOption: 'RAW'`. Em RAW o Sheets grava a string
+literalmente como texto, sem interpretar como número — zeros à esquerda são preservados e nenhum
+caractere (apóstrofo) é inserido. A leitura (`values.get`, `FORMATTED_VALUE`) devolve a mesma
+string; por segurança `cleanInscricaoRow` remove um apóstrofo inicial de linhas legadas.
+
 Funções públicas de escrita:
 
 | Função | Aba | Colunas |
 |---|---|---|
 | `appendEvento(row)` | Eventos | A:O (15 colunas) |
-| `appendInscricao(row)` | INSCRICOES | A:K (11 colunas) |
+| `appendInscricao(row)` | Inscricoes | A:L (12 colunas) |
 | `appendCheckInOut(row)` | CheckInOut | A:L (12 colunas) |
 | `appendGerenciador(row)` | Gerenciadores | A:E (5 colunas) — via `sheetAppend` |
 
@@ -416,8 +447,10 @@ LOGIN DO GERENCIADOR
 ### Eventos (A:O — 15 colunas)
 `id | titulo | descricao | data | horaInicio | horaFim | local | endereco | latitude | longitude | equipes(JSON) | valorHora(vazio) | status | gerenciadorId | criadoEm`
 
-### INSCRICOES (A:K — 11 colunas)
-`id | eventoId | nome | cpf | telefone | email | pixTipo | pixChave | equipe | tipo | criadoEm`
+### Inscricoes (A:L — 12 colunas)
+`id | eventoId | nome | cpf | telefone | email | pixTipo | pixChave | equipe | tipo | criadoEm | status`
+
+`status`: `ativa` | `confirmada` | `cancelada` (vazio em linhas antigas = ativa).
 
 ### CheckInOut (A:L — 12 colunas)
 `id | eventoId | cpf | nome | equipe | tipo | tipoRegistro | localRegistro | latitude | longitude | accuracy | timestamp`

@@ -60,7 +60,7 @@ Crie manualmente estas abas (sem acentos nos nomes):
 |---|---|
 | `Gerenciadores` | id, nome, email, status, criadoEm |
 | `Eventos` | id, titulo, descricao, data, horaInicio, horaFim, local, endereco, latitude, longitude, equipes(JSON), valorHora, status, gerenciadorId, criadoEm |
-| `INSCRICOES` | id, eventoId, nome, cpf, telefone, email, pixTipo, pixChave, equipe, tipo, criadoEm |
+| `INSCRICOES` | id, eventoId, nome, cpf, telefone, email, pixTipo, pixChave, equipe, tipo, criadoEm, status |
 | `CheckInOut` | id, eventoId, cpf, nome, equipe, tipo, tipoRegistro, localRegistro, latitude, longitude, accuracy, timestamp |
 
 > Os nomes de aba são case-sensitive. Não use acentos nem cedilha.

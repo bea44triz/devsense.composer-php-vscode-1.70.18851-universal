@@ -45,8 +45,8 @@ export async function fetchEvent(id: string): Promise<EventRow | null> {
 }
 
 export interface EventStats {
-  needed: number; confirmed: number; waiting: number; present: number; checkedOut: number; open: number
-  noShow: number; checkoutPending: number; incompleteTeams: number; plannedCost: number; validatedCost: number
+  needed: number; enrolled: number; confirmed: number; waiting: number; present: number; checkedOut: number; open: number
+  noShow: number; checkoutPending: number; incompleteTeams: number; plannedCost: number; confirmedCost: number; validatedCost: number
 }
 
 /** Indicadores do evento. Com `day`, presença considera só aquele dia (eventos de vários dias). */
@@ -59,6 +59,7 @@ export function eventStats(e: Pick<EventRow, 'event_teams' | 'event_participants
   const confIn = (teamId: string) => conf.filter((p) => p.team_id === teamId).length
   return {
     needed,
+    enrolled: e.event_participants.filter((p) => p.status !== 'cancelado' && p.status !== 'recusado').length,
     confirmed: conf.length,
     waiting: e.event_participants.filter((p) => p.status === 'aguardando' || p.status === 'inscrito').length,
     present: present.length,
@@ -68,13 +69,17 @@ export function eventStats(e: Pick<EventRow, 'event_teams' | 'event_participants
     checkoutPending: present.length - out.length,
     incompleteTeams: e.event_teams.filter((t) => confIn(t.id) < t.quantity).length,
     plannedCost: e.event_teams.reduce((s, t) => s + t.quantity * Number(t.rate), 0),
-    validatedCost: conf.reduce((s, p) => s + Number(p.final_amount ?? 0), 0),
+    confirmedCost: conf.reduce((s, p) => s + Number(p.rate ?? 0), 0),
+    validatedCost: conf.filter((p) => p.worked).reduce((s, p) => s + Number(p.final_amount ?? 0), 0),
   }
 }
 
-export interface TeamStats { team: TeamRow; needed: number; confirmed: number; present: number; arrivedMissing: number; open: number; waiting: number }
+export interface TeamStats {
+  team: TeamRow; needed: number; confirmed: number; present: number; arrivedMissing: number; open: number; waiting: number
+  plannedCost: number; confirmedCost: number; validatedCost: number
+}
 
-/** Painel por equipe: necessários, confirmados, presentes, confirmados que não chegaram, vagas. */
+/** Painel por equipe: necessários, confirmados, presentes, confirmados que não chegaram, vagas, previsão financeira. */
 export function teamStats(e: Pick<EventRow, 'event_teams' | 'event_participants'>, day?: string): TeamStats[] {
   return e.event_teams.map((t) => {
     const ps = e.event_participants.filter((p) => p.team_id === t.id)
@@ -85,6 +90,9 @@ export function teamStats(e: Pick<EventRow, 'event_teams' | 'event_participants'
       arrivedMissing: conf.length - present,
       open: Math.max(t.quantity - conf.length, 0),
       waiting: ps.filter((p) => p.status === 'aguardando' || p.status === 'inscrito').length,
+      plannedCost: t.quantity * Number(t.rate),
+      confirmedCost: conf.reduce((s, p) => s + Number(p.rate ?? 0), 0),
+      validatedCost: conf.filter((p) => p.worked).reduce((s, p) => s + Number(p.final_amount ?? 0), 0),
     }
   })
 }

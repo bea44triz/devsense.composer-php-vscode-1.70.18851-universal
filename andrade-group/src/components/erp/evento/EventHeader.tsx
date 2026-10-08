@@ -12,10 +12,12 @@ export function EventHeader({ e, companyName }: { e: EventRow; companyName?: str
   const ds = displayEventStatus(e.status, e.event_date, teamCounts(e), today, e.end_date)
   const kpis: [string, string | number, string?][] = [
     ['Necessários', st.needed],
+    ['Inscritos', st.enrolled],
     ['Confirmados', st.confirmed],
     [multi ? 'Presentes hoje' : 'Presentes', st.present],
     ['Vagas', st.open, st.open > 0 ? 'text-amber-400' : undefined],
     ['Previsto', brl(st.plannedCost)],
+    ['Confirmado', brl(st.confirmedCost)],
     ['Validado', brl(st.validatedCost)],
   ]
   return (
@@ -36,7 +38,7 @@ export function EventHeader({ e, companyName }: { e: EventRow; companyName?: str
           <div className="mt-2"><Pill tone={statusTone(ds)}>{ds}</Pill></div>
         </div>
       </div>
-      <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-6">
+      <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-8">
         {kpis.map(([l, v, cls]) => (
           <div key={l} className="rounded-2xl bg-white/5 px-3 py-2">
             <div className={`text-lg font-black tabular-nums ${cls ?? ''}`}>{v}</div>

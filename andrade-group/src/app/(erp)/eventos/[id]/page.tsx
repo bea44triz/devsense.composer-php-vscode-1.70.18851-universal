@@ -6,7 +6,7 @@ import { CheckCircle2, ClipboardCheck, ExternalLink, Loader2, MapPin, Pencil } f
 import { useScope } from '@/lib/erp/environment'
 import { useLoad } from '@/lib/erp/use-load'
 import { brl, fmtDateRange, fmtTime, todayISO } from '@/lib/erp/ops'
-import { eventStats, fetchEvent, fetchEventPayables, finishEvent, updateEventRefs, type EventRow } from '@/lib/erp/ops-data'
+import { eventStats, fetchEvent, fetchEventPayables, finishEvent, teamStats, updateEventRefs, type EventRow } from '@/lib/erp/ops-data'
 import { EventHeader } from '@/components/erp/evento/EventHeader'
 import { TeamsTab } from '@/components/erp/evento/TeamsTab'
 import { ProfessionalsTab } from '@/components/erp/evento/ProfessionalsTab'
@@ -147,10 +147,41 @@ function Overview({ e, canOperate, canAssign, canRegistry, onChanged }: { e: Eve
           <div className="flex justify-between py-1"><span className="text-slate-500">Confirmados sem check-in</span><b>{st.noShow}</b></div>
           <div className="flex justify-between py-1"><span className="text-slate-500">Check-out pendente</span><b>{st.checkoutPending}</b></div>
           <div className="flex justify-between py-1"><span className="text-slate-500">Equipes incompletas</span><b>{st.incompleteTeams}</b></div>
-          <div className="flex justify-between py-1"><span className="text-slate-500">Custo previsto</span><b>{brl(st.plannedCost)}</b></div>
         </div>
+        <Forecast e={e} />
       </div>
       {editing && <EditRefs e={e} canRegistry={canRegistry} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); onChanged() }} />}
+    </div>
+  )
+}
+
+/** Previsão de gastos do evento: previsto (planejado) × confirmado (quem confirmou) × validado (quem efetivamente trabalhou). */
+function Forecast({ e }: { e: EventRow }) {
+  const st = eventStats(e)
+  const teams = teamStats(e)
+  return (
+    <div className="rounded-3xl border border-slate-100 bg-white p-4 text-sm shadow-sm">
+      <div className="mb-2 text-xs font-bold uppercase tracking-widest text-slate-400">Previsão de gastos do evento</div>
+      <div className="divide-y divide-slate-100">
+        {teams.map((t) => (
+          <div key={t.team.id} className="flex items-center justify-between gap-2 py-2">
+            <span className="font-semibold text-slate-700">{t.team.name}</span>
+            <span className="flex gap-3 text-xs text-slate-500">
+              <span>Previsto <b className="text-slate-700">{brl(t.plannedCost)}</b></span>
+              <span>Confirmado <b className="text-slate-700">{brl(t.confirmedCost)}</b></span>
+              <span>Validado <b className="text-slate-700">{brl(t.validatedCost)}</b></span>
+            </span>
+          </div>
+        ))}
+      </div>
+      <div className="mt-2 flex items-center justify-between gap-2 border-t border-slate-200 pt-2 font-black text-slate-800">
+        <span>Total</span>
+        <span className="flex gap-3 text-sm">
+          <span>Previsto {brl(st.plannedCost)}</span>
+          <span>Confirmado {brl(st.confirmedCost)}</span>
+          <span>Validado {brl(st.validatedCost)}</span>
+        </span>
+      </div>
     </div>
   )
 }
@@ -180,11 +211,13 @@ function FinanceTab({ e }: { e: EventRow }) {
   const st = eventStats(e)
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="rounded-2xl border border-slate-100 bg-white p-3 shadow-sm"><div className="text-[11px] font-semibold uppercase text-slate-400">Previsto</div><div className="text-xl font-black">{brl(st.plannedCost)}</div></div>
+        <div className="rounded-2xl border border-slate-100 bg-white p-3 shadow-sm"><div className="text-[11px] font-semibold uppercase text-slate-400">Confirmado</div><div className="text-xl font-black">{brl(st.confirmedCost)}</div></div>
         <div className="rounded-2xl border border-slate-100 bg-white p-3 shadow-sm"><div className="text-[11px] font-semibold uppercase text-slate-400">Validado</div><div className="text-xl font-black">{brl(st.validatedCost)}</div></div>
         <div className="rounded-2xl border border-slate-100 bg-white p-3 shadow-sm"><div className="text-[11px] font-semibold uppercase text-slate-400">Lançado</div><div className="text-xl font-black">{brl((pay.data ?? []).reduce((a, p) => a + Number(p.amount), 0))}</div></div>
       </div>
+      <Forecast e={e} />
       {e.status !== 'fechado'
         ? <EmptyState title="Ainda sem contas a pagar" text="As contas a pagar são geradas automaticamente quando o fechamento do evento é enviado ao financeiro." />
         : pay.loading ? <Spinner /> : (pay.data ?? []).length === 0

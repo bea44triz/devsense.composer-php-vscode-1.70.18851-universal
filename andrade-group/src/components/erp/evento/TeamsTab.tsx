@@ -27,7 +27,7 @@ export function TeamsTab({ e, canOperate, onChanged, onViewTeam }: { e: EventRow
     <div className="space-y-3">
       {err && <ErrorBox>{err}</ErrorBox>}
       <div className="grid gap-3 md:grid-cols-2">
-        {teamStats(e).map(({ team: t, needed, confirmed, present, open, waiting }) => (
+        {teamStats(e).map(({ team: t, needed, confirmed, present, open, waiting, plannedCost, confirmedCost }) => (
           <div key={t.id} className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
             <div className="flex items-start justify-between gap-2">
               <div>
@@ -46,6 +46,10 @@ export function TeamsTab({ e, canOperate, onChanged, onViewTeam }: { e: EventRow
                   <div className="text-lg font-black tabular-nums">{v}</div><div className="text-[10px] font-semibold text-slate-400">{l}</div>
                 </div>
               ))}
+            </div>
+            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+              <span>Custo previsto: <b className="text-slate-700">{brl(plannedCost)}</b></span>
+              <span>Custo confirmado: <b className="text-slate-700">{brl(confirmedCost)}</b></span>
             </div>
             <Progress className="mt-3" value={pct(confirmed, needed)} tone={open === 0 ? 'success' : 'warning'} />
             {waiting > 0 && <p className="mt-2 text-xs font-semibold text-sky-700">{waiting} aguardando confirmação</p>}

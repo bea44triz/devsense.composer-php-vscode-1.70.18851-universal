@@ -18,7 +18,7 @@ for m in migrations/*.sql; do
 done
 
 fail=0
-for t in tests/isolation_fase1.sql tests/marco1_fluxo_evento.sql tests/marco2_seguranca_pontos_fixos.sql tests/security_checks.sql; do
+for t in tests/isolation_fase1.sql tests/marco1_fluxo_evento.sql tests/marco2_seguranca_pontos_fixos.sql tests/marco3_usuarios_e_ip.sql tests/security_checks.sql; do
   echo; echo "== $t"
   out="$($PSQL -A -F ' | ' -P footer=off -d "$DB" -f "$t" 2>&1 | grep -E '^(PASSOU|FALHOU|resultado)' || true)"
   echo "$out"

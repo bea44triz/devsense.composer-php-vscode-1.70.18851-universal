@@ -1351,6 +1351,19 @@ export type Database = {
           user_id: string
         }[]
       }
+      company_user_revoke: {
+        Args: { _company_id: string; _user_id: string }
+        Returns: undefined
+      }
+      company_user_set_access: {
+        Args: {
+          _active: boolean
+          _company_id: string
+          _permissions: Database["public"]["Enums"]["app_permission"][]
+          _user_id: string
+        }
+        Returns: undefined
+      }
       event_create: {
         Args: { _company_id: string; _event: Json; _teams: Json }
         Returns: string
@@ -1597,6 +1610,38 @@ export type Database = {
       team_name_key: {
         Args: { _name: string }
         Returns: string
+      }
+      user_lookup_by_email: {
+        Args: { _company_id: string; _email: string }
+        Returns: {
+          already_linked: boolean
+          email: string
+          full_name: string
+          user_id: string
+        }[]
+      }
+      user_operations_list: {
+        Args: { _company_id: string; _user_id: string }
+        Returns: {
+          code: string
+          name: string
+          operation_id: string
+          role: Database["public"]["Enums"]["operation_role"]
+          status: string
+          type: Database["public"]["Enums"]["operation_type"]
+        }[]
+      }
+      users_admin_list: {
+        Args: { _company_id: string }
+        Returns: {
+          active: boolean
+          email: string
+          full_name: string
+          is_platform_admin: boolean
+          operations_count: number
+          permissions: Database["public"]["Enums"]["app_permission"][]
+          user_id: string
+        }[]
       }
     }
     Enums: {

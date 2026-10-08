@@ -146,8 +146,9 @@ await check('E2 link público com token falso: mensagem genérica, sem dados', a
 })
 
 await check('E3 IP do limite de tentativas não é falsificável pelo cabeçalho X-Forwarded-For', async () => {
-  // o limite por IP usa request_ip() (1º item do X-Forwarded-For). Se o proxy do Supabase aceitar o valor do cliente,
-  // é preciso trocar o cabeçalho usado em request_ip() — ver docs/STAGING.md
+  // request_ip() usa o ÚLTIMO item de X-Forwarded-For (anexado pelo proxy confiável do Supabase ao repassar a
+  // conexão), não o 1º (o que o visitante manda). Um cliente que force o cabeçalho só consegue acrescentar um
+  // item à esquerda; o item da direita continua sendo o que o proxy observou de verdade.
   const forged = `203.0.113.${Number(RUN.slice(-2)) % 250 + 1}`
   const spoof = createClient(URL_, ANON, { ...opts, global: { headers: { 'x-forwarded-for': forged } } })
   const token = ok(await gestor061.c.from('event_teams').select('invite_token').eq('event_id', evA).single()).invite_token
@@ -155,8 +156,8 @@ await check('E3 IP do limite de tentativas não é falsificável pelo cabeçalho
   const last = ok(await users.superadmin.c.from('public_link_attempts').select('ip').order('id', { ascending: false }).limit(1))
   assert.ok(last.length === 1, 'tentativa não registrada')
   if (last[0].ip === forged) {
-    if (ref === 'local') { console.log('  (aviso: pilha local sem proxy — o IP enviado pelo cliente é aceito; no staging isto precisa passar)'); return }
-    throw new Error(`o banco gravou o IP enviado pelo cliente (${forged})`)
+    if (ref === 'local') { console.log('  (aviso: pilha local sem proxy de borda — o gateway fake repassa o cabeçalho sem anexar nada; no staging real isto precisa passar)'); return }
+    throw new Error(`o banco gravou o IP enviado pelo cliente (${forged}) — o proxy do Supabase não está anexando o IP real, ou TRUSTED_PROXY_HOPS precisa de ajuste`)
   }
 })
 

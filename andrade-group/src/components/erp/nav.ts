@@ -25,7 +25,7 @@ export const NAV: NavSection[] = [
   ] },
   { title: 'Administração', emphasis: 'tertiary', items: [
     { label: 'Empresas', icon: Building2, href: '/em-breve/empresas', soon: true },
-    { label: 'Usuários e Permissões', icon: Users, href: '/em-breve/usuarios', soon: true },
+    { label: 'Usuários e Permissões', icon: Users, href: '/administracao/usuarios' },
     { label: 'Clientes', icon: Handshake, href: '/cadastros/clientes' },
     { label: 'Centros de Custo', icon: Target, href: '/cadastros/centros-de-custo' },
     { label: 'Categorias', icon: Tags, href: '/em-breve/categorias', soon: true },
@@ -43,7 +43,6 @@ export const SOON: Record<string, { title: string; when: string; text: string }>
   relatorios: { title: 'Relatórios', when: 'Marco 3', text: 'Pagamentos por evento, ponto fixo, competência, empresa e banco (Excel/CSV/PDF).' },
   documentos: { title: 'Documentos', when: 'Marco 4', text: 'Arquivos privados por empresa.' },
   empresas: { title: 'Empresas', when: 'Marco 4', text: 'Já existe no banco (com CNPJ e regra de titular de conta).' },
-  usuarios: { title: 'Usuários e Permissões', when: 'Marco 4', text: 'Vínculos por empresa e permissões. Até lá, vínculos são feitos pelo administrador da plataforma.' },
   'centros-de-custo': { title: 'Centros de Custo', when: 'Marco 4', text: 'Hoje o centro de custo é informado no evento e segue para o lançamento.' },
   categorias: { title: 'Categorias', when: 'Marco 4', text: 'Categorias financeiras por empresa.' },
   'contas-bancarias': { title: 'Contas Bancárias', when: 'Marco 3', text: 'Já existe no banco, protegida por empresa (uma conta nunca paga lançamento de outra empresa).' },

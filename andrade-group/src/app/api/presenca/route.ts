@@ -27,6 +27,16 @@ async function reverseGeocode(lat: number, lng: number): Promise<string | null> 
 
 const num = (v: unknown, min: number, max: number) => (typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max ? v : null)
 
+/** Item confiável de X-Forwarded-For: conta TRUSTED_PROXY_HOPS da direita para a esquerda (padrão 1). */
+function trustedClientIp(xff: string | null): string | null {
+  if (!xff) return null
+  const parts = xff.split(',').map((p) => p.trim()).filter(Boolean)
+  if (parts.length === 0) return null
+  const hops = Math.max(1, Number(process.env.TRUSTED_PROXY_HOPS) || 1)
+  const idx = Math.max(0, parts.length - hops)
+  return parts[idx].slice(0, 64)
+}
+
 export async function POST(req: NextRequest) {
   let body: Record<string, unknown>
   try { body = await req.json() } catch { return NextResponse.json({ ok: false, error: 'Requisição inválida.' }, { status: 400 }) }
@@ -48,8 +58,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Registro de presença indisponível no momento.' }, { status: 503 })
   }
 
-  // IP do visitante (o primeiro da cadeia do proxy/CDN); vai para o limite de tentativas e para a auditoria
-  const ip = (req.headers.get('x-forwarded-for')?.split(',')[0] ?? req.headers.get('x-real-ip') ?? 'desconhecido').trim().slice(0, 64)
+  // IP do visitante para o limite de tentativas e a auditoria. NÃO é o 1º item de X-Forwarded-For (esse o
+  // próprio visitante pode mandar) — é o item anexado pelo proxy confiável na frente do Next.js (a borda da
+  // Vercel sobrescreve/anexa este cabeçalho; não repassa o valor que o cliente tentar forjar). TRUSTED_PROXY_HOPS
+  // conta, da direita para a esquerda, quantos proxies confiáveis existem na cadeia (padrão 1); ajustar se o
+  // ambiente final tiver mais de um proxy confiável em série (ver docs/STAGING.md).
+  const ip = trustedClientIp(req.headers.get('x-forwarded-for')) ?? req.headers.get('x-real-ip')?.trim().slice(0, 64) ?? 'desconhecido'
   const { data: allowed, error: limitErr } = await admin.rpc('public_link_check', { _kind: 'presenca', _token: token, _cpf: cpf, _ip: ip })
   if (limitErr) return NextResponse.json({ ok: false, error: 'Registro de presença indisponível no momento.' }, { status: 503 })
   if (!allowed) return NextResponse.json({ ok: false, error: 'Muitas tentativas a partir desta conexão. Aguarde alguns minutos.' }, { status: 429 })

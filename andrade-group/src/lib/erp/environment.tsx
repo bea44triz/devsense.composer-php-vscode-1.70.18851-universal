@@ -158,7 +158,7 @@ export function useEnvironment() {
 
 /** Escopo de dados da tela: empresa atual ou todas do consolidado (somente leitura). */
 export function useScope() {
-  const { env, companies, currentCompany, writable } = useEnvironment()
+  const { env, companies, currentCompany, writable, isPlatformAdmin, isGroupAdmin } = useEnvironment()
   const ids = env?.mode === 'consolidated' ? companies.map((c) => c.company_id) : currentCompany ? [currentCompany.company_id] : []
   const has = (p: CompanyCtx['permissions'][number]) =>
     !!currentCompany && (currentCompany.permissions.includes('empresa.admin') || currentCompany.permissions.includes(p))
@@ -175,5 +175,7 @@ export function useScope() {
     canRegistry: writable && ((has('operacao.gerenciar') && has('operacao.todos')) || has('financeiro.gerenciar')),
     /** dados financeiros completos (PIX inteiro) */
     canSeeFinanceData: has('financeiro.ver') || has('financeiro.gerenciar'),
+    /** gerencia usuários da empresa (mesma regra do banco: can_manage_company_users) */
+    canManageUsers: writable && (has('usuarios.gerenciar') || isPlatformAdmin || isGroupAdmin),
   }
 }

@@ -60,3 +60,6 @@ INSERT INTO auth.users (id, email) VALUES
   ('00000000-0000-0000-0000-00000000bb05', 'stg.coorda@staging.test'),
   ('00000000-0000-0000-0000-00000000bb06', 'stg.coordb@staging.test'),
   ('00000000-0000-0000-0000-00000000bb07', 'stg.financeiro@staging.test');
+
+-- usuário com conta mas ainda sem nenhuma empresa (roteiro do Marco 3: conceder acesso pela tela)
+INSERT INTO auth.users (id, email) VALUES ('00000000-0000-0000-0000-00000000cc01', 'novocoord@061.test');

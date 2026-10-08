@@ -1,6 +1,6 @@
 'use client'
 import Link from 'next/link'
-import { AlertTriangle, CalendarPlus, ChevronRight, ClipboardCheck, LogIn, LogOut, UserCheck, Users } from 'lucide-react'
+import { AlertTriangle, CalendarPlus, ChevronRight, ClipboardCheck, LogIn, LogOut, UserCheck, Users, Wallet } from 'lucide-react'
 import { useEnvironment, useScope } from '@/lib/erp/environment'
 import { useLoad } from '@/lib/erp/use-load'
 import { brl, todayISO } from '@/lib/erp/ops'
@@ -29,6 +29,7 @@ export default function HomePage() {
   const upcoming = active.filter((e) => e.event_date > today).slice(0, 6)
   const toClose = active.filter((e) => e.status === 'aguardando_fechamento' || last(e) < today)
 
+  const openCompetences = (posts.data ?? []).filter((p) => p.status === 'ativo').reduce((a, p) => a + p.fixed_post_periods.filter((c) => c.status === 'aberta').length, 0)
   const pend = pendencias(todays, active.filter((e) => last(e) >= today), toClose, today)
   const openPay = (payables.data ?? []).filter((p) => OPEN_PAYABLE.includes(p.status))
   const name = (email ?? '').split('@')[0]
@@ -81,6 +82,7 @@ export default function HomePage() {
             <PendItem icon={LogIn} n={pend.checkin} text="check-ins pendentes hoje" />
             <PendItem icon={LogOut} n={pend.checkout} text="check-outs pendentes hoje" />
             <PendItem icon={ClipboardCheck} n={pend.fechamento} text="eventos aguardando fechamento" href={toClose[0] ? `/eventos/${toClose[0].id}/fechamento` : undefined} />
+            <PendItem icon={Wallet} n={openCompetences} text="competências de Ponto Fixo aguardando validação" href="/pontos-fixos" />
           </div>
 
           {(payables.data ?? []).length > 0 && (

@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "demo": "bash tests/e2e/demo-up.sh",
+    "demo:reset": "bash tests/e2e/demo-reset.sh",
+    "demo:stop": "bash tests/e2e/stop.sh"
   },
   "dependencies": {
     "@react-google-maps/api": "^2.20.8",

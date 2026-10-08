@@ -63,3 +63,23 @@ INSERT INTO auth.users (id, email) VALUES
 
 -- usuário com conta mas ainda sem nenhuma empresa (roteiro do Marco 3: conceder acesso pela tela)
 INSERT INTO auth.users (id, email) VALUES ('00000000-0000-0000-0000-00000000cc01', 'novocoord@061.test');
+
+-- ===== Dados para a demonstração ao vivo (docs/DEMO.md) =====
+-- Usuários dedicados à apresentação (independentes dos usuários dos testes automatizados acima).
+INSERT INTO auth.users (id, email) VALUES
+  ('00000000-0000-0000-0000-00000000dd01', 'demo@061.test'),            -- login principal da demo: cria evento, confirma, encerra, valida, envia ao financeiro
+  ('00000000-0000-0000-0000-00000000dd02', 'financeiro.demo@061.test'); -- login do financeiro: só consulta/gerencia contas a pagar
+UPDATE profiles SET full_name = 'Coordenador Demo' WHERE id = '00000000-0000-0000-0000-00000000dd01';
+UPDATE profiles SET full_name = 'Financeiro Demo' WHERE id = '00000000-0000-0000-0000-00000000dd02';
+INSERT INTO company_users (company_id, user_id) VALUES
+  ('c0000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-00000000dd01'),
+  ('c0000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-00000000dd02');
+INSERT INTO company_user_permissions VALUES
+  ('c0000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-00000000dd01', 'operacao.gerenciar'),
+  ('c0000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-00000000dd01', 'financeiro.ver'),
+  ('c0000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-00000000dd02', 'financeiro.gerenciar');
+
+-- Cadastros auxiliares da demo (cliente e centro de custo): o evento em si é criado ao vivo na apresentação.
+INSERT INTO clientes_evento (company_id, razao_social, nome_fantasia, documento) VALUES
+  ('c0000000-0000-0000-0000-000000000002', 'Cliente Demonstração Ltda', 'Cliente Demonstração', '22333444000181');
+INSERT INTO centros_custo (company_id, codigo, nome) VALUES ('c0000000-0000-0000-0000-000000000002', 'CC-DEMO', 'Demonstração');

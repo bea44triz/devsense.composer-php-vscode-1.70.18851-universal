@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useParams, useSearchParams } from 'next/navigation'
-import { CheckCircle2, ClipboardCheck, ExternalLink, Loader2, MapPin, Pencil } from 'lucide-react'
+import { CheckCircle2, ClipboardCheck, ExternalLink, Loader2, MapPin, Pencil, RefreshCw } from 'lucide-react'
 import { useScope } from '@/lib/erp/environment'
 import { useLoad } from '@/lib/erp/use-load'
 import { brl, fmtDateRange, fmtTime, todayISO } from '@/lib/erp/ops'
@@ -44,6 +44,14 @@ export default function EventoPage() {
         </div>
       )}
       <StatusBanner e={e} canOperate={canOperate} onChanged={ev.reload} />
+
+      <div className="mb-2 flex justify-end">
+        <button onClick={ev.reload} disabled={ev.loading}
+          className="inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
+          title="Buscar inscrições, confirmações e presenças feitas em outra aba (ex.: link público do freelancer)">
+          <RefreshCw className={ev.loading ? 'h-3.5 w-3.5 animate-spin' : 'h-3.5 w-3.5'} />Atualizar
+        </button>
+      </div>
 
       <Tabs<Tab> value={tab} onChange={setTab} tabs={[
         { key: 'geral', label: 'Visão Geral' },

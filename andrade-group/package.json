@@ -9,7 +9,9 @@
     "lint": "eslint",
     "demo": "bash tests/e2e/demo-up.sh",
     "demo:reset": "bash tests/e2e/demo-reset.sh",
-    "demo:stop": "bash tests/e2e/stop.sh"
+    "demo:stop": "bash tests/e2e/stop.sh",
+    "dev:demo": "node scripts/dev-demo.mjs",
+    "dev:demo:reset": "node scripts/dev-demo-reset.mjs"
   },
   "dependencies": {
     "@react-google-maps/api": "^2.20.8",

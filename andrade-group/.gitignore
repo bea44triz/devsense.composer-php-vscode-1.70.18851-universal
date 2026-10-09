@@ -36,6 +36,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# modo demonstração local (dados gerados em npm run dev:demo, resetáveis)
+/.demo-data/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

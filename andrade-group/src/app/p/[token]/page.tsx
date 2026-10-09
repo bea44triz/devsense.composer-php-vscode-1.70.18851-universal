@@ -8,6 +8,7 @@ import { getSupabase, isSupabaseConfigured } from '@/lib/supabase/client'
 import { useLoad } from '@/lib/erp/use-load'
 import { haversineMeters } from '@/lib/erp/ops'
 import { PublicCard, PublicShell } from '@/components/erp/PublicShell'
+import { isDemoModeClient } from '@/lib/demo/config'
 
 interface Info {
   kind: 'checkin' | 'checkout'; event_name: string; company_name: string; event_date: string; end_date: string; today: string; start_time: string | null; end_time: string | null
@@ -73,6 +74,16 @@ function Presenca({ token, info }: { token: string; info: Info }) {
     )
   }
 
+  /** Só existe em modo demo (nunca em produção): evita depender de GPS real para demonstrar o fluxo. */
+  function simulateLocation() {
+    setErr(null)
+    const lat = info.event_lat ?? -15.793889
+    const lng = info.event_lng ?? -47.882778
+    const jitter = () => (Math.random() - 0.5) * 0.0015
+    setGeo({ lat: lat + jitter(), lng: lng + jitter(), accuracy: 12 })
+    setStep('confirm')
+  }
+
   async function confirm() {
     if (!photo || !geo) return
     setBusy(true); setErr(null)
@@ -122,6 +133,11 @@ function Presenca({ token, info }: { token: string; info: Info }) {
             <p className="text-sm text-slate-500">Agora precisamos da sua localização.</p>
             {err && <p className="text-sm text-red-600">{err}</p>}
             <button onClick={getLocation} disabled={busy} className={btn}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <LocateFixed className="h-4 w-4" />}Obter localização</button>
+            {isDemoModeClient() && (
+              <button onClick={simulateLocation} type="button" className="w-full rounded-2xl border-2 border-dashed border-amber-300 bg-amber-50 py-3 text-sm font-bold text-amber-700">
+                Simular localização (modo demo)
+              </button>
+            )}
           </div>
         ) : step === 'confirm' && geo ? (
           <div className="space-y-4">
@@ -198,6 +214,26 @@ function CameraCapture({ onCapture }: { onCapture: (dataUrl: string) => void }) 
       </div>
       {error && <p className="text-sm text-red-600">{error}</p>}
       <button onClick={snap} disabled={!ready} className={btn}><Camera className="h-5 w-5" />Tirar foto</button>
+      {isDemoModeClient() && (
+        <button type="button" onClick={() => onCapture(demoPhotoDataUrl())} className="w-full rounded-2xl border-2 border-dashed border-amber-300 bg-amber-50 py-3 text-sm font-bold text-amber-700">
+          Simular foto (modo demo)
+        </button>
+      )}
     </div>
   )
+}
+
+/** Só existe em modo demo (nunca em produção): evita depender de câmera real para demonstrar o fluxo. */
+function demoPhotoDataUrl(): string {
+  const c = document.createElement('canvas')
+  c.width = 480; c.height = 480
+  const ctx = c.getContext('2d')
+  if (!ctx) return ''
+  ctx.fillStyle = '#f59e0b'; ctx.fillRect(0, 0, 480, 480)
+  ctx.fillStyle = '#ffffff'
+  ctx.font = 'bold 220px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+  ctx.fillText('👤', 240, 210)
+  ctx.font = 'bold 26px sans-serif'
+  ctx.fillText('FOTO SIMULADA', 240, 410)
+  return c.toDataURL('image/jpeg', 0.8)
 }

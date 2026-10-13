@@ -27,14 +27,18 @@ const PIX_TIPOS = [
 
 export default function InscricaoPage() {
   const { token } = useParams<{ token: string }>()
+  // autoRefresh: false — esta é uma página pública de formulário multi-etapa com estado local (em
+  // <Inscricao>, montada condicionalmente logo abaixo). Uma recarga silenciosa em segundo plano (foco
+  // na janela, polling) deixaria `loading` true por um instante mesmo com `info.data` já carregado;
+  // sem a guarda `&& !info.data` isso desmontaria <Inscricao> e apagaria tudo que a pessoa já preencheu.
   const info = useLoad(async () => {
     if (!isSupabaseConfigured) return null
     const { data, error } = await getSupabase().rpc('public_invite_info', { _token: token })
     if (error) throw error
     return data as unknown as Info | null
-  }, token)
+  }, token, { autoRefresh: false })
 
-  if (info.loading) return <PublicShell><div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-amber-500" /></div></PublicShell>
+  if (info.loading && !info.data) return <PublicShell><div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-amber-500" /></div></PublicShell>
   if (!info.data) return <PublicShell title="Link inválido"><PublicCard><p className="text-center text-sm text-slate-500">Confira o link com o coordenador da equipe.</p></PublicCard></PublicShell>
   return <Inscricao token={token} info={info.data} />
 }

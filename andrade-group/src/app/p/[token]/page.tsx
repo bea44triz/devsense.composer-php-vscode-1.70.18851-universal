@@ -23,13 +23,16 @@ const btn = 'flex w-full items-center justify-center gap-2 rounded-2xl bg-amber-
 
 export default function PresencaPage() {
   const { token } = useParams<{ token: string }>()
+  // autoRefresh: false — formulário multi-etapa com estado local (foto, GPS) em <Presenca> logo
+  // abaixo; uma recarga silenciosa (foco/polling) desmontaria esse componente e apagaria o progresso.
+  // Ver o comentário equivalente em src/app/i/[token]/page.tsx.
   const info = useLoad(async () => {
     if (!isSupabaseConfigured) return null
     const { data, error } = await getSupabase().rpc('public_presence_info', { _token: token })
     if (error) throw error
     return data as unknown as Info | null
-  }, token)
-  if (info.loading) return <PublicShell><div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-amber-500" /></div></PublicShell>
+  }, token, { autoRefresh: false })
+  if (info.loading && !info.data) return <PublicShell><div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-amber-500" /></div></PublicShell>
   if (!info.data) return <PublicShell title="Link inválido"><PublicCard><p className="text-center text-sm text-slate-500">Confira o link com o coordenador.</p></PublicCard></PublicShell>
   return <Presenca token={token} info={info.data} />
 }

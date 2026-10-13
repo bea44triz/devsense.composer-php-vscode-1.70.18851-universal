@@ -19,10 +19,21 @@ interface FromRequest {
 
 interface Resp<T> { data: T; error: { message: string; code?: string } | null }
 
+/**
+ * Igual ao @supabase/supabase-js de verdade: `.rpc()`/`.from()` NUNCA rejeita a Promise, só devolve
+ * `{data, error}` — todo o app conta com isso e não tem try/catch ao redor dessas chamadas. Por isso
+ * qualquer falha daqui pra baixo (rede, servidor fora do ar, JSON inválido) precisa virar `error`,
+ * nunca escapar como exceção: um `fetch()` que rejeita (reinício do servidor em dev, extensão do
+ * navegador interferindo, uma falha de rede qualquer) travaria o botão para sempre sem nenhum aviso.
+ */
 async function gateway<T>(body: Record<string, unknown>): Promise<Resp<T>> {
-  const r = await fetch('/api/demo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-  if (!r.ok && r.status !== 400) return { data: null as T, error: { message: 'Modo demo indisponível. Reinicie com npm run dev:demo.' } }
-  return (await r.json()) as Resp<T>
+  try {
+    const r = await fetch('/api/demo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    if (!r.ok && r.status !== 400) return { data: null as T, error: { message: 'Modo demo indisponível. Reinicie com npm run dev:demo.' } }
+    return (await r.json()) as Resp<T>
+  } catch {
+    return { data: null as T, error: { message: 'Não foi possível falar com o modo demo. Verifique sua conexão e tente novamente.' } }
+  }
 }
 
 class DemoQuery<T = unknown> implements PromiseLike<Resp<T>> {
